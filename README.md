@@ -28,3 +28,18 @@ unset NDEX_USER # optional
 unset NDEX_PWD # optional
 ```
 
+## Headless option
+
+`Ctrl-b` is the default tmux prefix key.
+
+```sh
+cd wikipathways2ndex
+nix-shell
+tmux new -s wikipathways2ndex
+xvfb-run cytoscape --rest 1234
+# Ctrl-b then c to create a new window
+Rscript run.sh
+# Ctrl-b then x to close window 1
+# Ctrl-b then x to close window 0
+# Ctrl-d to exit nix-shell
+```

@@ -20,8 +20,13 @@ stdenv.mkDerivation rec {
     # Add packages from nix-env -qaP | grep -i needle queries
     #dos2unix
     #cytoscape
-    xorg.xf86videodummy
+
+    # TODO: xf86videodummy is maybe supposed to be the replacement for xvfb?
+    #xorg.xf86videodummy
+    xvfb_run
+
     dplyr
+    purrr
     readr
     tidyr
     cytoscape371

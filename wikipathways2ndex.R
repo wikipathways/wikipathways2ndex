@@ -65,12 +65,13 @@ wikipathways2ndex <- function(wikipathwaysId) {
 		write('In your terminal, run:', stderr())
 		write('export NDEX_USER=\'your-ndex-username\'', stderr())
 		write('export NDEX_PWD=\'your-ndex-password\'', stderr())
-		result <- list(status='FAIL', response=NULL)
+		result <- list(status='FAIL', response=NA)
 	} else {
 		exportResponse <- exportNetworkToNDEx(NDEX_USER, NDEX_PWD, isPublic=TRUE)
 		#exportResponse <- exportNetworkToNDEx(NDEX_USER, NDEX_PWD, isPublic=TRUE, base.url='http://dev2.ndexbio.org/v2')
 		#exportResponse <- exportNetworkToNDEx(NDEX_USER, NDEX_PWD, isPublic=TRUE, base.url='http://test.ndexbio.org/v2')
 		result <- list(status='SUCCESS', response=exportResponse)
 	}
+	closeSession(FALSE)
 	return(result)
 }
