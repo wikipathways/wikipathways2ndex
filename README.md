@@ -6,7 +6,13 @@ Just install [Nix](https://nixos.org/nix/download.html), and the rest of the dep
 
 ## Headless Option
 
-1. In `pathway_ids.tsv`, specify the WikiPathways IDs you'd like to convert and export to NDEx.
+1. Clone and enter this repo:
+
+```sh
+https://github.com/wikipathways/wikipathways2ndex.git
+cd wikipathways2ndex
+```
+
 2. Set your NDEx username and password:
 
 ```sh
@@ -14,13 +20,11 @@ export NDEX_USER="username-for-your-ndex-account"
 export NDEX_PWD="password-for-your-ndex-account"
 ```
 
-3. Execute:
+3. In the file `pathway_ids.tsv`, specify the WikiPathways IDs you'd like to convert and export to NDEx.
 
-```sh
-./run.sh
-```
+4. Execute: `./run.sh`
 
-This option [uses `xvfb-run`](http://elementalselenium.com/tips/38-headless) as a dummy display to enable running Cytoscape in headless mode.
+FYI: we used [`xvfb-run`](http://elementalselenium.com/tips/38-headless) as a dummy display to enable running Cytoscape in headless mode.
 
 ## GUI Option
 
