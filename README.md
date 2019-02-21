@@ -9,7 +9,7 @@ Just install [Nix](https://nixos.org/nix/download.html), and the rest of the dep
 1. Clone and enter this repo:
 
 ```sh
-https://github.com/wikipathways/wikipathways2ndex.git
+git clone https://github.com/wikipathways/wikipathways2ndex.git
 cd wikipathways2ndex
 ```
 
@@ -20,7 +20,7 @@ export NDEX_USER="username-for-your-ndex-account"
 export NDEX_PWD="password-for-your-ndex-account"
 ```
 
-3. In the file `pathway_ids.tsv`, specify the WikiPathways IDs you'd like to convert and export to NDEx.
+3. In the file `pathway_ids.tsv`, specify the [WikiPathways](http://wikipathways.org) IDs you'd like to convert and export to [NDEx](http://ndexbio.org).
 
 4. Execute: `./run.sh`
 
