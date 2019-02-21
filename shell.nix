@@ -21,6 +21,9 @@ stdenv.mkDerivation rec {
     #dos2unix
     #cytoscape
     xorg.xf86videodummy
+    dplyr
+    readr
+    tidyr
     cytoscape371
     R
     RCy3
