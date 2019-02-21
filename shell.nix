@@ -21,8 +21,9 @@ stdenv.mkDerivation rec {
     #dos2unix
     #cytoscape
 
-    # TODO: xf86videodummy is maybe supposed to be the replacement for xvfb?
+    # TODO: should we use something other than xvfb_run? See README.md.
     #xorg.xf86videodummy
+    #xpra
     xvfb_run
 
     dplyr
@@ -32,6 +33,7 @@ stdenv.mkDerivation rec {
     cytoscape371
     R
     RCy3
+    tmux
 
     #nix-env -iA nixos.rPackages.RCy3
 
