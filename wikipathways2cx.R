@@ -2,6 +2,13 @@ library(dplyr)
 library(tidyr)
 library(RCy3)
 
+# TODO: where should we output these files? We should allow for specifying the output location.
+CX_OUTPUT_DIR = file.path(Sys.getenv('HOME'), 'wikipathways2ndex', 'cx')
+if (!dir.exists(CX_OUTPUT_DIR)) {
+	write(paste0('Warning: Directory', CX_OUTPUT_DIR, 'does not exist. Creating now.'), stderr())
+	dir.create(CX_OUTPUT_DIR)
+}
+
 appInStringAndInstalled <- function(appName, x) {
 	# version is not strictly semver. It can have a format like this: 1.1.0.2
 	passes <- grepl(paste0('name: ', appName, ', version: \\d\\.\\d(\\.\\d)+, status: Installed'), perl = TRUE, x)
@@ -24,12 +31,16 @@ if (!bridgedbInstalled) {
 	write('BridgeDb now installed.', stderr())
 }
 
-# TODO: do we need to specify versions or otherwise ensure we're using an acceptable version?
 #updateApp('WikiPathways')
 #updateApp('BridgeDb')
 
-wikipathways2ndex <- function(wikipathwaysId) {
+wikipathways2cx <- function(wikipathwaysId) {
+	print('wikipathwaysId')
+	print(wikipathwaysId)
+
 	net.suid <- commandsGET(paste0('wikipathways import-as-pathway id="', wikipathwaysId, '"'))
+	#print('getTableColumns()')
+	#print(getTableColumns())
 	mapped.cols <- mapTableColumn('XrefId', 'Human', 'Entrez Gene', 'HGNC')
 	only.mapped.cols <- mapped.cols[complete.cases(mapped.cols), 'HGNC', drop=FALSE]
 	colnames(only.mapped.cols) <- 'XrefId'
@@ -48,22 +59,9 @@ wikipathways2ndex <- function(wikipathwaysId) {
 	## TODO: why does this work but the two above do not update the name for GALNT13?
 	loadTableData(hgncified_df, table.key.column = 'SUID')
 
-	NDEX_USER <- Sys.getenv("NDEX_USER")
-	NDEX_PWD <- Sys.getenv("NDEX_PWD")
-	result <- list()
-	if (NDEX_USER == '' || NDEX_PWD == '') {
-		write('Error: environment variables NDEX_USER and/or NDEX_PWD not set.', stderr())
-		write('In your terminal, run:', stderr())
-		write('export NDEX_USER=\'your-ndex-username\'', stderr())
-		write('export NDEX_PWD=\'your-ndex-password\'', stderr())
-		result <- list(status='FAIL', response=NA)
-	} else {
-		exportResponse <- exportNetworkToNDEx(NDEX_USER, NDEX_PWD, isPublic=TRUE)
-		# See https://github.com/wikipathways/wikipathways2ndex/issues/1
-		#exportResponse <- exportNetworkToNDEx(NDEX_USER, NDEX_PWD, isPublic=TRUE, base.url='http://dev2.ndexbio.org/v2')
-		#exportResponse <- exportNetworkToNDEx(NDEX_USER, NDEX_PWD, isPublic=TRUE, base.url='http://test.ndexbio.org/v2')
-		result <- list(status='SUCCESS', response=exportResponse)
-	}
+	networkName <- getNetworkName()
+	filename <- paste0(wikipathwaysId, '__', gsub("_-_", "__", gsub(" ", "_", networkName)))
+	exportResponse <- exportNetwork(filename=file.path(CX_OUTPUT_DIR, filename), type='CX')
 	closeSession(FALSE)
-	return(result)
+	return(exportResponse)
 }

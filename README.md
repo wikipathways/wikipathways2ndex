@@ -66,3 +66,15 @@ Why does the following command fail to fully open Cytoscape?
 ```sh
 nohup cytoscape --rest 1234 &
 ```
+
+# Troubleshooting
+
+If you get a curl error, it's likely your session had an error and didn't shutdown correctly.
+
+```sh
+ps aux | grep Xvfb # get pid
+kill -9 <pid> # use the pid from the previous step
+```
+
+tmux attach
+Ctrl-b x
