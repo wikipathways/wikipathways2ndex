@@ -5,8 +5,13 @@ library(RCy3)
 # TODO: where should we output these files? We should allow for specifying the output location.
 CX_OUTPUT_DIR = file.path(Sys.getenv('HOME'), 'wikipathways2ndex', 'cx')
 if (!dir.exists(CX_OUTPUT_DIR)) {
-	write(paste0('Warning: Directory', CX_OUTPUT_DIR, 'does not exist. Creating now.'), stderr())
+	write(paste('Warning: Directory', CX_OUTPUT_DIR, 'does not exist. Creating now.'), stderr())
 	dir.create(CX_OUTPUT_DIR)
+} else {
+	# TODO: is there a better way to check for an empty directory? We need >2 b/c we have '.' and '..'
+	if(length(dir(CX_OUTPUT_DIR, all.files=TRUE)) > 2) {
+		stop(paste('Error for wikipathways2cx in wikipathways2cx.R: output dir', CX_OUTPUT_DIR, 'must be empty.'))
+	}
 }
 
 appInStringAndInstalled <- function(appName, x) {
@@ -35,9 +40,6 @@ if (!bridgedbInstalled) {
 #updateApp('BridgeDb')
 
 wikipathways2cx <- function(wikipathwaysId) {
-	print('wikipathwaysId')
-	print(wikipathwaysId)
-
 	net.suid <- commandsGET(paste0('wikipathways import-as-pathway id="', wikipathwaysId, '"'))
 	#print('getTableColumns()')
 	#print(getTableColumns())

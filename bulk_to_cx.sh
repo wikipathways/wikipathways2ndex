@@ -22,4 +22,7 @@ Rscript bulk_to_cx.R
 # kludge to wait for cytoscape to shutdown
 sleep 10
 
+if [[ $(ps aux | grep Xvfb | wc -l) -gt 1 ]]; then
+	echo 'Warning: did xvfb-run ... fail to exit?' > /dev/stderr
+fi
 tmux kill-session -t wikipathways2ndex
