@@ -2,6 +2,7 @@ library(dplyr)
 library(purrr)
 library(readr)
 library(tidyr)
+library(RCy3)
 
 tryCatch({
 	source('./wikipathways2cx.R')

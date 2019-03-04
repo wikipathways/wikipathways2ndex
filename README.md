@@ -78,3 +78,14 @@ kill -9 <pid> # use the pid from the previous step
 
 tmux attach
 Ctrl-b x
+
+WP3300 has P69723, which is a viral protein. That's why bridgedb fails to convert it to HGNC.
+WP4191 had metabolites, which may have been why bridgedb couldn't convert to HGNC.
+
+We need to kludge the generated CX. The last element is the status, and it currently is a fail.
+
+```
+jq '.[-1]' ./cx/WP3980__Protein_alkylation_leading_to_liver_fibrosis__Homo_sapiens.cx 
+```
+
+If we remove the error and set `"success": true`, we can upload it to test.ndexbio.org.

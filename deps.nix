@@ -1,6 +1,7 @@
 with import <nixpkgs> { config.allowUnfree = true; };
 
 let
+  # Pull request made: https://github.com/NixOS/nixpkgs/pull/56498
   cytoscape371 = callPackage ./cytoscape.nix {}; 
 in
 runCommand "dummy" {

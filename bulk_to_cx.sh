@@ -23,6 +23,6 @@ Rscript bulk_to_cx.R
 sleep 10
 
 if [[ $(ps aux | grep Xvfb | wc -l) -gt 1 ]]; then
-	echo 'Warning: did xvfb-run ... fail to exit?' > /dev/stderr
+	echo 'Warning: did xvfb-run your-cmd fail to exit?' > /dev/stderr
 fi
 tmux kill-session -t wikipathways2ndex
