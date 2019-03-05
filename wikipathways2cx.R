@@ -96,9 +96,6 @@ wikipathways2cx <- function(wikipathwaysId) {
 		i <- i + 1
 	}
 
-	print('getTableColumns()')
-	print(getTableColumns())
-
 	networkName <- getNetworkName()
 	filename <- paste0(wikipathwaysId, '__', gsub("_-_", "__", gsub(" ", "_", networkName)))
 	exportResponse <- exportNetwork(filename=file.path(CX_OUTPUT_DIR, filename), type='CX')
