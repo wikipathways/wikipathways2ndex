@@ -14,13 +14,10 @@ tmux new-session -d -s wikipathways2ndex
 # Send command to the tmux session to launch cytoscape w/ the Xvfb fake display
 tmux send-keys 'xvfb-run cytoscape --rest 1234' C-m
 
-# kludge to wait for cytoscape to launch
-sleep 30
-
 Rscript bulk_to_cx.R
 
 # kludge to wait for cytoscape to shutdown
-sleep 10
+sleep 5
 
 if [[ $(ps aux | grep Xvfb | wc -l) -gt 1 ]]; then
 	echo 'Warning: did xvfb-run your-cmd fail to exit?' > /dev/stderr
@@ -28,3 +25,5 @@ fi
 tmux kill-session -t wikipathways2ndex
 
 bash ./integer_double_error_kludge.sh
+
+mv ./WP*.png ./cx/

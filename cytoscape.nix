@@ -1,4 +1,4 @@
-{ stdenv, fetchurl, jre, makeWrapper }:
+{ stdenv, fetchurl, jre10, makeWrapper }:
 
 stdenv.mkDerivation rec {
   name = "cytoscape-${version}";
@@ -9,7 +9,7 @@ stdenv.mkDerivation rec {
     sha256 = "1mhsngbwbgdwl70wj7850zg94534lasihwv2ryifardm35mkh48k";
   };
 
-  buildInputs = [jre makeWrapper];
+  buildInputs = [jre10 makeWrapper];
 
   installPhase = ''
     mkdir -pv $out/{share,bin}
@@ -18,8 +18,8 @@ stdenv.mkDerivation rec {
     ln -s $out/share/cytoscape.sh $out/bin/cytoscape
 
     wrapProgram $out/share/cytoscape.sh \
-      --set JAVA_HOME "${jre}" \
-      --set JAVA  "${jre}/bin/java"
+      --set JAVA_HOME "${jre10}" \
+      --set JAVA  "${jre10}/bin/java"
 
     chmod +x $out/bin/cytoscape
   '';

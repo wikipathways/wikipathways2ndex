@@ -14,7 +14,11 @@ runCommand "dummy" {
     cytoscape371
     R
     RCy3
+    rjson
     tmux
+
+    # needed for kludge for double/integer bug
+    jq
 
     # TODO: should we use something other than xvfb_run? See README.md.
     #xorg.xf86videodummy

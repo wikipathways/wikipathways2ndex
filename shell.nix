@@ -33,6 +33,7 @@ stdenv.mkDerivation rec {
     cytoscape371
     R
     RCy3
+    rjson
     tmux
 
     #nix-env -iA nixos.rPackages.RCy3
