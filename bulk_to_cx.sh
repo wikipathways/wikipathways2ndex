@@ -26,3 +26,5 @@ if [[ $(ps aux | grep Xvfb | wc -l) -gt 1 ]]; then
 	echo 'Warning: did xvfb-run your-cmd fail to exit?' > /dev/stderr
 fi
 tmux kill-session -t wikipathways2ndex
+
+bash ./integer_double_error_kludge.sh
