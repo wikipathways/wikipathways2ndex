@@ -6,23 +6,22 @@
 # #! /usr/bin/env bash
 # because it allows us to specify and load the exact version of every required dependency.
 
+reuse=$1
 
-# Equivalent to Ctrl-b c to create a new window,
-# followed by Ctrl-b d to detach
-tmux new-session -d -s wikipathways2ndex
-
-# Send command to the tmux session to launch cytoscape w/ the Xvfb fake display
-tmux send-keys 'xvfb-run cytoscape --rest 1234' C-m
+if [[ $(ps aux | grep Xvfb | wc -l) -gt 1 ]] && [[ $(tmux ls | grep wikipathways2ndex) ]]; then
+	echo 'Using existing Cytoscape instance...' > /dev/stderr
+else
+	echo 'Starting Cytoscape...' > /dev/stderr
+	bash ./cytoscapestart.sh
+fi
 
 Rscript bulk_to_cx.R
 
-# kludge to wait for cytoscape to shutdown
-sleep 5
-
-if [[ $(ps aux | grep Xvfb | wc -l) -gt 1 ]]; then
-	echo 'Warning: did xvfb-run your-cmd fail to exit?' > /dev/stderr
+if [[ ! -z $reuse ]]; then
+	echo 'Cytoscape left open for further use...' > /dev/stderr
+else
+	bash ./cytoscapestop.sh
 fi
-tmux kill-session -t wikipathways2ndex
 
 bash ./integer_double_error_kludge.sh
 

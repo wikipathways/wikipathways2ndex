@@ -48,5 +48,6 @@ tryCatch({
 	#stop(e)
 	#write(paste0('Error:', w), stderr())
 }, finally = {
-	commandQuit()
+	# letting this be handled in the bash script instead
+	#commandQuit()
 })

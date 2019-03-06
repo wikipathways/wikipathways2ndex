@@ -5,6 +5,7 @@ library(rjson)
 
 source('./connect.R')
 connect()
+source('./unify.R')
 
 # TODO: where should we output these files? We should allow for specifying the output location.
 CX_OUTPUT_DIR = file.path(Sys.getenv('HOME'), 'wikipathways2ndex', 'cx')
@@ -34,53 +35,22 @@ if (!wikipathwaysInstalled) {
 	installApp('WikiPathways')
 	write('WikiPathways now installed.', stderr())
 }
+#updateApp('WikiPathways')
 
+# TODO: do we need BridgeDb if we're just using mapTableColumn
 if (!bridgedbInstalled) {
 	write('Warning: BridgeDb not installed. Installing now...', stderr())
 	installApp('BridgeDb')
 	write('BridgeDb now installed.', stderr())
 }
-
-#updateApp('WikiPathways')
 #updateApp('BridgeDb')
-
-# To get the data sources that can be converted to HGNC,
-# we first get all data sources from here:
-# http://webservice.bridgedb.org/Human/sourceDataSources
-#
-# Then we filter to only include the ones that can be converted to HGNC.
-# We do this by checking that the following URL responds with 'true',
-# replacing WikiGenes with each different data source:
-# http://webservice.bridgedb.org/Human/isMappingSupported/WikiGenes/HGNC
-#
-# This process yields the following data sources as of 2019-03-04:
-ALL_DATASOURCES_CONVERTIBLE_TO_HGNC <- c(
-	      'WikiGenes',
-	      'RefSeq',
-	      'OMIM',
-	      'Illumina',
-	      'Rfam',
-	      'miRBase Sequence',
-	      'PDB',
-	      'Ensembl',
-	      'Affy',
-	      'Uniprot-TrEMBL',
-	      'Entrez Gene',
-	      'UCSC Genome Browser',
-	      # should we run mapTableColumn(..., ..., HGNC, HGNC)?
-	      'HGNC',
-	      'GeneOntology',
-	      'UniGene',
-	      'Agilent')
 
 wikipathways2cx <- function(wikipathwaysId) {
 	print(wikipathwaysId)
 	net.suid <- commandsGET(paste0('wikipathways import-as-pathway id="', wikipathwaysId, '"'))
 
 	networkName <- getNetworkName()
-	print(networkName)
 	organism <- gsub(".*\\s\\-\\s", "", networkName)
-	print(organism)
 	filename <- paste0(wikipathwaysId, '__', gsub("_-_", "__", gsub(" ", "_", networkName)))
 	filepath_san_ext <- file.path(CX_OUTPUT_DIR, filename)
 
@@ -92,66 +62,14 @@ wikipathways2cx <- function(wikipathwaysId) {
 	#exportImage(paste(CX_OUTPUT_DIR, wikipathwaysId, sep = '/'), 'PNG', zoom=200)
 	exportImage(paste('/home/ariutta/wikipathways2ndex', filename, sep = '/'), 'PNG', zoom=200)
 
-	if (organism == 'Homo sapiens') {
-		# TODO: why does this work for WP3980 but throws an error for WP554?
-		mapTableColumn('Ensembl', organism, 'Ensembl', 'HGNC')
-		renameTableColumn('HGNC', 'FromEnsembl')
-		print('mapTableColumn done')
-
-		datasources <- unique(getTableColumns()[['XrefDatasource']])
-		datasourcesInNetworkConvertibleToHGNC <- intersect(datasources, ALL_DATASOURCES_CONVERTIBLE_TO_HGNC)
-		for (datasource in datasourcesInNetworkConvertibleToHGNC) {
-			mapTableColumn('XrefId', organism, datasource, 'HGNC')
-		}
-
-		tableColumns <- as_tibble(getTableColumns())
-		hgncCoalesced <- coalesce(!!!select(tableColumns, starts_with('HGNC')))
-
-		hgncified_o <- bind_cols(tableColumns, hgncCoalesced=hgncCoalesced) %>%
-			mutate(name=ifelse(is.na(hgncCoalesced) | !(XrefDatasource %in% ALL_DATASOURCES_CONVERTIBLE_TO_HGNC), name, hgncCoalesced))
-
-		#hgncified_t <- select(hgncified_o, 'shared name', 'name', 'XrefId', 'XrefDatasource', 'Type')
-		#hgncified_t <- select(hgncified_o, 'shared name', 'FromEnsembl', 'name', 'hgncCoalesced', 'Ensembl', 'XrefId', 'XrefDatasource', 'Type')
-		#hgncified_t <- select(hgncified_o, 'shared name', 'name', 'hgncCoalesced', 'Ensembl', 'XrefId', 'XrefDatasource', 'Type')
-		hgncified_t <- select(hgncified_o, 'shared name', 'name', 'FromEnsembl', 'hgncCoalesced', 'Ensembl', 'XrefId', 'XrefDatasource', 'Type') %>%
-			filter(name != FromEnsembl & XrefDatasource %in% datasourcesInNetworkConvertibleToHGNC)
-			#filter((name != FromEnsembl | name != `shared name`) & (XrefDatasource %in% datasourcesInNetworkConvertibleToHGNC))
-
-		print('hgncified_t')
-		print(as.data.frame(hgncified_t))
-
-		hgncified <- select(hgncified_o, 'SUID', 'name')
-
-		## TODO: why do neither of the two lines below correctly update the name column?
-		## For example, try converting WP554 and verify that prostacyclin is now named GALNT13.
-		## But further update: that's wrong. prostacyclin is a metabolite.
-		#loadTableData(as.data.frame(hgncified))
-		#loadTableData(as.data.frame(hgncified), table.key.column = 'SUID')
-
-		## Maybe I need it's something about tidyr not using row names?
-		## We could take a look at using something like this:
-		## column_to_rownames(hgncified_df, var = "SUID")
-
-		# The following code does work, but couldn't it be simplified?
-		hgncified_df <- as.data.frame(hgncified)
-		row.names(hgncified_df) <- hgncified_df[["SUID"]]
-		loadTableData(hgncified_df, table.key.column = 'SUID')
-
-		# When available, HGNCs are going into the name column, so we can get rid of
-		# the HGNC, HGNC (1), ... columns
-		deleteTableColumn('HGNC')
-		i <- 1
-		for (datasource in datasourcesInNetworkConvertibleToHGNC) {
-			deleteTableColumn(paste0('HGNC (', i, ')'))
-			i <- i + 1
-		}
-	}
+	unify(organism)
 
 	# save as cx
 	exportResponse <- exportNetwork(filename=filepath_san_ext, type='CX')
 	# TODO: right now, exportResponse only has one named item: 'file'.
-	# But it should include status info too. Then we could possibly just
-	# use exportResponse instead of making the 'response' list further below.
+	# But it should also include the status info from the cx. 
+	# Then w could possibly just use exportResponse instead of making the
+	# 'response' list further below.
 
 	filepathCx <- paste0(filepath_san_ext, '.cx')
 
