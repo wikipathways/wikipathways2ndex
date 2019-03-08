@@ -15,14 +15,10 @@ else
 	bash ./cytoscapestart.sh
 fi
 
-Rscript bulk_to_cx.R
+Rscript bulk2ndex.R
 
 if [[ ! -z $reuse ]]; then
 	echo 'Cytoscape left open for further use...' > /dev/stderr
 else
 	bash ./cytoscapestop.sh
 fi
-
-bash ./integer_double_error_kludge.sh
-
-mv ./WP*.png ./cx/

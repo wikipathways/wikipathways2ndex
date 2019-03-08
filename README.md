@@ -8,8 +8,6 @@ Just install [Nix](https://nixos.org/nix/download.html), and the rest of the dep
 
 # Usage
 
-## Headless Option
-
 1. Clone and enter this repo:
 
 ```sh
@@ -26,33 +24,18 @@ export NDEX_PWD="password-for-your-ndex-account"
 
 3. In the file `pathway_ids.tsv`, specify the WikiPathways IDs you'd like to convert and export to NDEx.
 
-4. Execute: `./run.sh`
+4. Execute: `./bulk2ndex.sh`
 
 FYI: we used [`xvfb-run`](http://elementalselenium.com/tips/38-headless) as a dummy display to enable running Cytoscape in headless mode.
 
-## GUI Option
+# Troubleshooting
 
-It's possible to run Cytoscape on a remote computer while viewing it on your local computer.
+If you get a curl error, it's likely your session had an error and didn't shutdown correctly.
 
-In one terminal:
 ```sh
-ssh -Y wikipathways-workspace.gladstone.internal
-cd wikipathways2ndex
-nix-shell
-cytoscape --rest 1234
-```
-
-In another terminal:
-```sh
-ssh wikipathways-workspace.gladstone.internal
-cd wikipathways2ndex
-nix-shell
-export NDEX_USER="username-for-your-ndex-account"
-export NDEX_PWD="password-for-your-ndex-account"
-Rscript wikipathways2ndex.R
-#R -f wikipathways2ndex.R
-unset NDEX_USER # optional
-unset NDEX_PWD # optional
+ps aux | grep Xvfb # get pid
+kill -9 <pid> # use the pid from the previous step
+tmux kill-session
 ```
 
 # TODO
@@ -67,25 +50,15 @@ Why does the following command fail to fully open Cytoscape?
 nohup cytoscape --rest 1234 &
 ```
 
-# Troubleshooting
+Error running tests:
 
-If you get a curl error, it's likely your session had an error and didn't shutdown correctly.
-
-```sh
-ps aux | grep Xvfb # get pid
-kill -9 <pid> # use the pid from the previous step
-```
-
-tmux attach
-Ctrl-b x
-
-WP3300 has P69723, which is a viral protein. That's why bridgedb fails to convert it to HGNC.
-WP4191 had metabolites, which may have been why bridgedb couldn't convert to HGNC.
-
-We need to kludge the generated CX. The last element is the status, and it currently is a fail.
-
-```
-jq '.[-1]' ./cx/WP3980__Protein_alkylation_leading_to_liver_fibrosis__Homo_sapiens.cx 
-```
-
-If we remove the error and set `"success": true`, we can upload it to test.ndexbio.org.
+------- test.customGraphics
+Opening ./sampleData/sessions/Yeast Perturbation.cys...
+RCy3::commandsPOST, HTTP Error Code: 500
+ url=http://localhost:1234/v1/commands/session/open
+ body={
+ "file": "./sampleData/sessions/Yeast Perturbation.cys" 
+}
+Error in commandsPOST(paste0("session open ", type, "=\"", file.location,  : 
+  File 'Yeast Perturbation.cys' not found:
+Calls: run.tests -> test.customGraphics -> openSession -> commandsPOST

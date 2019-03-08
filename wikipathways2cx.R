@@ -1,14 +1,16 @@
 library(dplyr)
-library(tidyr)
+library(here)
 library(RCy3)
 library(rjson)
+library(tidyr)
 
 source('./connect.R')
 connect()
 source('./unify.R')
 
 # TODO: where should we output these files? We should allow for specifying the output location.
-CX_OUTPUT_DIR = file.path(Sys.getenv('HOME'), 'wikipathways2ndex', 'cx')
+#CX_OUTPUT_DIR = file.path(Sys.getenv('HOME'), 'wikipathways2ndex', 'cx')
+CX_OUTPUT_DIR = here('cx')
 if (!dir.exists(CX_OUTPUT_DIR)) {
 	write(paste('Warning: Directory', CX_OUTPUT_DIR, 'does not exist. Creating now.'), stderr())
 	dir.create(CX_OUTPUT_DIR)
@@ -46,7 +48,6 @@ if (!bridgedbInstalled) {
 #updateApp('BridgeDb')
 
 wikipathways2cx <- function(wikipathwaysId) {
-	print(wikipathwaysId)
 	net.suid <- commandsGET(paste0('wikipathways import-as-pathway id="', wikipathwaysId, '"'))
 
 	networkName <- getNetworkName()
@@ -55,12 +56,11 @@ wikipathways2cx <- function(wikipathwaysId) {
 	filepath_san_ext <- file.path(CX_OUTPUT_DIR, filename)
 
 	# save as png
-	# TODO:: why does only the last of the following work?
-	# It appears the file must be in the cwd.
-	#exportImage(filepath_san_ext, 'PNG', zoom=200)
-	#exportImage(file.path(CX_OUTPUT_DIR, wikipathwaysId), 'PNG', zoom=200)
-	#exportImage(paste(CX_OUTPUT_DIR, wikipathwaysId, sep = '/'), 'PNG', zoom=200)
-	exportImage(paste('/home/ariutta/wikipathways2ndex', filename, sep = '/'), 'PNG', zoom=200)
+	exportImage(here(filename), 'PNG', zoom=200)
+	# TODO:: It appears the file must be in the cwd. If I do this:
+	#exportImage(here('cx', filename), 'PNG', zoom=200)
+	# I get this error:
+	# parse error: Invalid numeric literal at line 1, column 5
 
 	unify(organism)
 

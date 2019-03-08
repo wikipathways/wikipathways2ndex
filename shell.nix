@@ -20,21 +20,30 @@ stdenv.mkDerivation rec {
     # Add packages from nix-env -qaP | grep -i needle queries
     #dos2unix
     #cytoscape
+    cytoscape371
+    tmux
 
     # TODO: should we use something other than xvfb_run? See README.md.
     #xorg.xf86videodummy
     #xpra
     xvfb_run
 
-    dplyr
-    purrr
-    readr
-    tidyr
-    cytoscape371
+    # needed for kludge for double/integer bug
+    jq
+
+    # R and R packages
     R
+    dplyr
+    here
+    purrr
     RCy3
+    readr
     rjson
-    tmux
+    tidyr
+    # needed for running tests:
+    RUnit
+    graph
+    igraph
 
     #nix-env -iA nixos.rPackages.RCy3
 

@@ -7,23 +7,30 @@ in
 runCommand "dummy" {
   # Customizable development requirements
   buildInputs = with rPackages; [
-    dplyr
-    purrr
-    readr
-    tidyr
     cytoscape371
-    R
-    RCy3
-    rjson
     tmux
-
-    # needed for kludge for double/integer bug
-    jq
 
     # TODO: should we use something other than xvfb_run? See README.md.
     #xorg.xf86videodummy
     #xpra
     xvfb_run
+
+    # needed for kludge for double/integer bug
+    jq
+
+    # R and R packages
+    R
+    dplyr
+    here
+    purrr
+    RCy3
+    readr
+    rjson
+    tidyr
+    # needed for running tests:
+    RUnit
+    graph
+    igraph
 
   ];
 } ""
