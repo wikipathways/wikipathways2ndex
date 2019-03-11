@@ -8,21 +8,7 @@ source('./connect.R')
 connect()
 source('./unify.R')
 
-appInStringAndInstalled <- function(appName, x) {
-	# version is not strictly semver. It can have a format like this: 1.1.0.2
-	passes <- grepl(paste0('name: ', appName, ', version: \\d\\.\\d(\\.\\d)+, status: Installed'), perl = TRUE, x)
-	return(passes)
-}
-
-installedApps <- getInstalledApps()
-wikipathwaysInstalled <- length(installedApps[appInStringAndInstalled('WikiPathways', installedApps)]) == 1
-
-if (!wikipathwaysInstalled) {
-	write('Warning: WikiPathways not installed. Installing now...', stderr())
-	installApp('WikiPathways')
-	write('WikiPathways now installed.', stderr())
-}
-#updateApp('WikiPathways')
+installApp('WikiPathways')
 
 wikipathways2ndex <- function(wikipathwaysId) {
 	net.suid <- commandsGET(paste0('wikipathways import-as-pathway id="', wikipathwaysId, '"'))

@@ -9,23 +9,6 @@ library(RCy3)
 # code for unification for other sources and targets.
 #############################################################
 
-appInStringAndInstalled <- function(appName, x) {
-	# version is not strictly semver. It can have a format like this: 1.1.0.2
-	passes <- grepl(paste0('name: ', appName, ', version: \\d\\.\\d(\\.\\d)+, status: Installed'), perl = TRUE, x)
-	return(passes)
-}
-
-installedApps <- getInstalledApps()
-bridgedbInstalled <- length(installedApps[appInStringAndInstalled('BridgeDb', installedApps)]) == 1
-
-if (!bridgedbInstalled) {
-	write('Warning: BridgeDb not installed. Installing now...', stderr())
-	installApp('BridgeDb')
-	write('BridgeDb now installed.', stderr())
-}
-
-#updateApp('BridgeDb')
-
 unify <- function(organism) {
 	# TODO: it appears I can't run mapTableColumn for mouse and human pathways in
 	# the same batch. Any of these combos work:

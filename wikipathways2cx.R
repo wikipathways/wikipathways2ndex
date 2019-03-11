@@ -22,30 +22,7 @@ if (!dir.exists(CX_OUTPUT_DIR)) {
 	}
 }
 
-appInStringAndInstalled <- function(appName, x) {
-	# version is not strictly semver. It can have a format like this: 1.1.0.2
-	passes <- grepl(paste0('name: ', appName, ', version: \\d\\.\\d(\\.\\d)+, status: Installed'), perl = TRUE, x)
-	return(passes)
-}
-
-installedApps <- getInstalledApps()
-wikipathwaysInstalled <- length(installedApps[appInStringAndInstalled('WikiPathways', installedApps)]) == 1
-bridgedbInstalled <- length(installedApps[appInStringAndInstalled('BridgeDb', installedApps)]) == 1
-
-if (!wikipathwaysInstalled) {
-	write('Warning: WikiPathways not installed. Installing now...', stderr())
-	installApp('WikiPathways')
-	write('WikiPathways now installed.', stderr())
-}
-#updateApp('WikiPathways')
-
-# TODO: do we need BridgeDb if we're just using mapTableColumn
-if (!bridgedbInstalled) {
-	write('Warning: BridgeDb not installed. Installing now...', stderr())
-	installApp('BridgeDb')
-	write('BridgeDb now installed.', stderr())
-}
-#updateApp('BridgeDb')
+installApp('WikiPathways')
 
 wikipathways2cx <- function(wikipathwaysId) {
 	net.suid <- commandsGET(paste0('wikipathways import-as-pathway id="', wikipathwaysId, '"'))
