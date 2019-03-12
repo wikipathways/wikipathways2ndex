@@ -1,5 +1,5 @@
 #! /usr/bin/env nix-shell
-#! nix-shell ../deps.nix -i bash
+#! nix-shell ../nix_shell_shebang_dependencies.nix -i bash
 
 # NOTE: what you see above is a [Nix shebang](https://nixos.org/nix/manual/#ssec-nix-shell-shebang).
 # We used it instead of this shebang:
@@ -8,22 +8,22 @@
 
 reuse=$1
 
-if [[ $(ps aux | grep Xvfb | wc -l) -gt 1 ]] && [[ $(tmux ls | grep wikipathways2ndex) ]]; then
-	echo 'Using existing Cytoscape instance...' > /dev/stderr
-else
-	echo 'Starting Cytoscape...' > /dev/stderr
-	bash ./cytoscapestart.sh
+# from https://unix.stackexchange.com/a/84980
+TMPDIR=`mktemp -d 2>/dev/null || mktemp -d -t 'wikipathways2ndextmpdir'`
+
+bash ./cytoscapestart.sh
+
+if [ -d ./cx ]; then
+	mv ./cx $TMPDIR
 fi
-
-#mkdir -p ./sampleData
-#cp -r /nix/store/pc9iyrdh5l2pp8szp2iwagc218pd468v-cytoscape-3.7.1/share/sampleData/* ./sampleData
-
 Rscript ./test/test.R
+if [ -d $TMPDIR ]; then
+	mv $TMPDIR ./cx
+fi
+rm WP554__ACE_Inhibitor_Pathway__Homo_sapiens.png
 
 if [[ ! -z $reuse ]]; then
 	echo 'Cytoscape left open for further use...' > /dev/stderr
 else
 	bash ./cytoscapestop.sh
 fi
-
-#rm -rf ./sampleData

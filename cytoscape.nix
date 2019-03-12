@@ -1,5 +1,7 @@
 { stdenv, fetchurl, jre10, makeWrapper }:
 
+ # Pull request made: https://github.com/NixOS/nixpkgs/pull/56498
+
 stdenv.mkDerivation rec {
   name = "cytoscape-${version}";
   version = "3.7.1";

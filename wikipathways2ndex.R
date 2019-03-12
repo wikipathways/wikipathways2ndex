@@ -4,8 +4,6 @@ library(RCy3)
 library(rjson)
 library(tidyr)
 
-source('./connect.R')
-connect()
 source('./unify.R')
 
 installApp('WikiPathways')

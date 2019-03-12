@@ -1,18 +1,76 @@
+#-------------------------------------------------------------------------------
+library (RCy3)
+library (RUnit)
+library (graph)
 library(here)
-library(RCy3)
+library (igraph)
 
-source('connect.R')
-connect()
+source('./wikipathways2cx.R')
 
-installApp("enhancedGraphics")
+#-------------------------------------------------------------------------------
+run.tests = function()
+{
+    options('warn'=0) # deprecation warnings (and others) are stored and reported
+    
+    # before doing anything else, make sure that the Cytoscape plugin version is one we can respond to
+    test.app.version()
+    
+    # start with a clean slate, and no windows
+    deleteAllNetworks()     
 
-source('./test/test_RCy3.R')
+    test.wikipathways2cx()
+    
+    closeSession(FALSE)
+    options('warn'=0)
+    
+} # run.tests
+#-------------------------------------------------------------------------------
+# almost every test needs to
+#
+#   1) announce it's name to stdout
+#   2) delete any previous network with the same title, should any exist
+#
+# these services are provided here
+#
+test.prep = function (title, make.net=TRUE)
+{
+    write (noquote (sprintf ('------- %s', title)), stderr ())
+    
+    if(!make.net)
+        return()
+    
+    if (title %in% as.character(getNetworkList())){
+        deleteNetwork(title)
+    }
+    
+    net.suid = createNetworkFromIgraph(makeSimpleIgraph(), title=title)
+    return(unname(net.suid))
+} 
+
+#-------------------------------------------------------------------------------
+test.app.version = function ()
+{
+    title = 'test.app.version'
+    test.prep(title,FALSE)
+    app.version.string = cytoscapeVersionInfo()
+    app.version.string = unname(app.version.string['apiVersion'])
+    string.tmp = gsub ('[a-z]', '', app.version.string)
+    major.minor.version = as.numeric (string.tmp)
+    checkTrue (major.minor.version >= 1)
+    
+} 
+
+#-------------------------------------------------------------------------------
+test.wikipathways2cx = function ()
+{
+    title = 'test.wikipathways2cx'
+    test.prep(title,FALSE)
+    response <- wikipathways2cx('WP554')
+    checkEquals (response$error, NA)
+    checkTrue (response$success)
+    checkTrue (file.exists('WP554__ACE_Inhibitor_Pathway__Homo_sapiens.png'))
+    checkTrue (file.exists('cx/WP554__ACE_Inhibitor_Pathway__Homo_sapiens.cx'))
+    
+}
 
 run.tests()
-
-# TODO: the following don't work:
-#openSession()
-#openSession(file.location="./sampleData/sessions/Yeast Perturbation.cys")
-#openSession(file.location="./test/sampleData/sessions/Yeast Perturbation.cys")
-# This does:
-#openSession(file.location=here("test", "sampleData", "sessions", "Yeast Perturbation.cys"))

@@ -1,5 +1,5 @@
 #! /usr/bin/env nix-shell
-#! nix-shell deps.nix -i bash
+#! nix-shell ./nix_shell_shebang_dependencies.nix -i bash
 
 # NOTE: what you see above is a [Nix shebang](https://nixos.org/nix/manual/#ssec-nix-shell-shebang).
 # We used it instead of this shebang:
@@ -7,7 +7,7 @@
 # because it allows us to specify and load the exact version of every required dependency.
 
 
-Rscript close.R
+Rscript cytoscapestop.R
 
 # kludge to wait for cytoscape to shutdown
 sleep 5

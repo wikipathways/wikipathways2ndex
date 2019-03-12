@@ -4,8 +4,6 @@ library(RCy3)
 library(rjson)
 library(tidyr)
 
-source('./connect.R')
-connect()
 source('./unify.R')
 
 # TODO: where should we output these files? We should allow for specifying the output location.
@@ -41,14 +39,18 @@ wikipathways2cx <- function(wikipathwaysId) {
 
 	unify(organism)
 
+	filepathCx <- paste0(filepath_san_ext, '.cx')
+	filepathCys <- paste0(filepath_san_ext, '.cys')
+	#closeSession<-function(TRUE, filename=filepathCys)
+	closeSession(TRUE, filename=filepath_san_ext)
+	openSession(file.location=filepathCys)
+
 	# save as cx
 	exportResponse <- exportNetwork(filename=filepath_san_ext, type='CX')
 	# TODO: right now, exportResponse only has one named item: 'file'.
 	# But it should also include the status info from the cx. 
 	# Then w could possibly just use exportResponse instead of making the
 	# 'response' list further below.
-
-	filepathCx <- paste0(filepath_san_ext, '.cx')
 
 	response <- list(file=filepathCx)
 

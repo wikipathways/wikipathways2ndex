@@ -45,6 +45,8 @@ xf86videodummy is maybe supposed to be the replacement for xvfb.
 It's also possible to [use `xpra` like `xvfb-run`](https://unix.stackexchange.com/questions/279567/how-to-use-xpra-like-xvfb-run)
 `nix-env -iA nixos.xpra`
 
+[Interesting example](https://github.com/NixOS/nixpkgs/blob/37694c8cc0e9ecab60d06f1d9a2fd0073bcc5fa3/pkgs/development/r-modules/generic-builder.nix#L29) of using R or R in X.
+
 Why does the following command fail to fully open Cytoscape?
 ```sh
 nohup cytoscape --rest 1234 &
