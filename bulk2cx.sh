@@ -19,4 +19,6 @@ else
 	bash ./cytoscapestop.sh
 fi
 
-mv ./WP*.png ./cx/
+if ls -1 WP*.png 2>&1 > /dev/null && ls -1 ./cx/ 2>&1 > /dev/null; then
+	mv ./WP*.png ./cx/
+fi

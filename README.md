@@ -64,3 +64,23 @@ RCy3::commandsPOST, HTTP Error Code: 500
 Error in commandsPOST(paste0("session open ", type, "=\"", file.location,  : 
   File 'Yeast Perturbation.cys' not found:
 Calls: run.tests -> test.customGraphics -> openSession -> commandsPOST
+
+### Headless kludge
+
+Put job running and detach:
+
+```
+screen -R
+rm -rf cx; ./bulk2ndex.sh
+# Ctrl+a
+# d
+```
+
+Now you can leave. To check up on the job and then close the screen:
+
+```
+screen -R
+# look at what's going on. if it's good, then:
+# Ctrl+a
+# K
+```

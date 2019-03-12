@@ -17,6 +17,7 @@ in [
     R
 ] ++ (with rPackages; [
   RCy3
+  rWikiPathways
   dplyr
   here
   purrr

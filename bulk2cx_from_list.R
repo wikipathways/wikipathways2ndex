@@ -4,7 +4,6 @@ library(readr)
 library(tidyr)
 library(RCy3)
 source('./wikipathways2cx.R')
-source('./get_pathways.R')
 
 
 get_file <- function(mylist) {
@@ -14,15 +13,18 @@ get_file <- function(mylist) {
 }
 
 get_value_by_key <- function(mylist, mykey) {
-	return(unname(unlist(lapply(mylist, function(x) x[mykey]))))
+	passes <- grepl(paste0('name: ', appName, ', version: \\d\\.\\d(\\.\\d)+, status: Installed'), perl = TRUE, x)
+	return(passes)
 }
 
 
 tryCatch({
-	#pathway_ids <- read_lines('./pathway_ids.tsv')
-	pathway_ids <- head(get_value_by_key(getAnalysisCollection(), 'id'))
-	#pathway_ids <- get_value_by_key(getAnalysisCollection(), 'id')[8:10]
+	pathway_ids <- read_lines('./pathway_ids.tsv')
 	
+#	for (pathway_id in pathway_ids) {
+#		wikipathways2cx(pathway_id)
+#	}
+
 	results <- tibble(pathway_id=pathway_ids) %>%
 		mutate(ndex_result=map(pathway_id, wikipathways2cx)) %>%
 		mutate(file=map_chr(ndex_result, "file")) %>%
@@ -32,6 +34,7 @@ tryCatch({
 		separate(organism_plus_cx, into = c("organism", "extension"), sep = "\\.") %>%
 		select(pathway_id, file, pathway_name, organism, success, error)
 
+	#print(results)
 	print(as.data.frame(results))
 }, warning = function(w) {
 	write('Warning for wikipathways2cx in bulk_to_cx.R:', stderr())

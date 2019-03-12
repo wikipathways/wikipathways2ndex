@@ -17,10 +17,11 @@ if [ -d ./cx ]; then
 	mv ./cx $TMPDIR
 fi
 Rscript ./test/test.R
+rm WP554__ACE_Inhibitor_Pathway__Homo_sapiens.png
+rm -rf ./cx
 if [ -d $TMPDIR ]; then
 	mv $TMPDIR ./cx
 fi
-rm WP554__ACE_Inhibitor_Pathway__Homo_sapiens.png
 
 if [[ ! -z $reuse ]]; then
 	echo 'Cytoscape left open for further use...' > /dev/stderr

@@ -2,12 +2,12 @@ library(dplyr)
 library(here)
 library(RCy3)
 library(rjson)
+library(rWikiPathways)
 library(tidyr)
 
 source('./unify.R')
 
 # TODO: where should we output these files? We should allow for specifying the output location.
-#CX_OUTPUT_DIR = file.path(Sys.getenv('HOME'), 'wikipathways2ndex', 'cx')
 CX_OUTPUT_DIR = here('cx')
 if (!dir.exists(CX_OUTPUT_DIR)) {
 	write(paste('Warning: Directory', CX_OUTPUT_DIR, 'does not exist. Creating now.'), stderr())
@@ -25,10 +25,32 @@ installApp('WikiPathways')
 wikipathways2cx <- function(wikipathwaysId) {
 	net.suid <- commandsGET(paste0('wikipathways import-as-pathway id="', wikipathwaysId, '"'))
 
+	pathwayInfo <- getPathwayInfo(wikipathwaysId)
+	print('pathwayInfo')
+	print(pathwayInfo)
+
+	ontologyTerms <- getOntologyTerms(wikipathwaysId)
+	diseaseOntologyTerms <- unlist(lapply(ontologyTerms[unname(unlist(lapply(ontologyTerms, function(x) {x["ontology"] == 'Disease'})))], function(x) {x[['name']]}))
+	print('diseaseOntologyTerms')
+	print(diseaseOntologyTerms)
+    
+	# This code gets username, but not the actual name of the user.
+#	pathwayHistory <- getPathwayHistory(wikipathwaysId, 19700101)
+#	print('pathwayHistory')
+#	print(pathwayHistory)
+
 	networkName <- getNetworkName()
 	organism <- gsub(".*\\s\\-\\s", "", networkName)
 	filename <- paste0(wikipathwaysId, '__', gsub("_-_", "__", gsub(" ", "_", networkName)))
 	filepath_san_ext <- file.path(CX_OUTPUT_DIR, filename)
+
+	networkTableColumns <- getTableColumns(table = 'network')
+	print('networkTableColumns')
+	print(networkTableColumns)
+	networkTableColumnsUpdated <- data.frame("version" = c(pathwayInfo[5]), "organism")
+	print('networkTableColumnsUpdated')
+	print(networkTableColumnsUpdated)
+	loadTableData(networkTableColumnsUpdated, table = 'network')
 
 	# save as png
 	exportImage(here(filename), 'PNG', zoom=200)
