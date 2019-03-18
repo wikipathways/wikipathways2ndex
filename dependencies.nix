@@ -24,6 +24,7 @@ in [
   readr
   rjson
   tidyr
+  utf8
   # needed for running tests:
   RUnit
   graph

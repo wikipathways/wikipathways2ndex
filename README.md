@@ -84,3 +84,11 @@ screen -R
 # Ctrl+a
 # K
 ```
+
+Input is not proper UTF-8, indicate encoding !
+Bytes: 0xE6 0x6B 0x20 0x52
+Error getting description in wikipathways2ndex.R:
+Error: 1: Input is not proper UTF-8, indicate encoding !
+Bytes: 0xE6 0x6B 0x20 0x52
+
+wget 'https://github.com/wikipathways/cytoscape-wikipathways-app/blob/develop/WikiPathways-3.3.73.jar?raw=true' -O ~/CytoscapeConfiguration/3/apps/installed/WikiPathways-v3.3.7-3.jar

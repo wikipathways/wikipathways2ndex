@@ -21,9 +21,9 @@ get_value_by_key <- function(mylist, mykey) {
 tryCatch({
 	deleteAllNetworks()
 	#pathway_ids <- read_lines('./pathway_ids.tsv')
-	#pathway_ids <- get_value_by_key(getAnalysisCollection(), 'id')[8]
+	#pathway_ids <- get_value_by_key(getAnalysisCollection(), 'id')[20]
 	#pathway_ids <- get_value_by_key(getAnalysisCollection(), 'id')
-	pathway_ids <- tail(get_value_by_key(getAnalysisCollection(), 'id'), -20)
+	pathway_ids <- tail(get_value_by_key(getAnalysisCollection(), 'id'), -338)
 	results <- tibble(pathway_id=pathway_ids) %>%
 		mutate(ndex_result=map(pathway_id, wikipathways2ndex)) %>%
 		mutate(name=map_chr(ndex_result, "name")) %>%
