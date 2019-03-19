@@ -18,8 +18,7 @@ cd wikipathways2ndex
 Temporary: until the updated version (>= 3.3.7-3) of the WikiPathways app for Cytoscape is put into production, do this:
 
 ```sh
-rm "$HOME/CytoscapeConfiguration/3/apps/installed/WikiPathways-v*.jar"
-wget 'https://github.com/wikipathways/cytoscape-wikipathways-app/blob/develop/WikiPathways-3.3.73.jar?raw=true' -O "$HOME/CytoscapeConfiguration/3/apps/installed/WikiPathways-v3.3.7-3.jar"
+bash ./install_dev_wikipathways_app.sh
 ```
 
 2. Create an account at [NDEx](http://ndexbio.org) if you don't have one. Then set your NDEx username and password (perhaps in `~/.profile`):

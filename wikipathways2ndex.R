@@ -8,6 +8,11 @@ library(tidyr)
 library(XML)
 library(utf8)
 
+# Using dev version at present
+# https://github.com/wikipathways/cytoscape-wikipathways-app/blob/develop/WikiPathways-3.3.73.jar
+#installApp('WikiPathways')
+system("bash ./install_dev_wikipathways_app.sh")
+
 source('./unify.R')
 
 NDEX_USER <- Sys.getenv("NDEX_USER")
@@ -37,10 +42,6 @@ if (!dir.exists(CX_OUTPUT_DIR)) {
 		stop(paste('Error for wikipathways2cx in wikipathways2cx.R: output dir', CX_OUTPUT_DIR, 'must be empty.'))
 	}
 }
-
-# Using dev version at present
-# https://github.com/wikipathways/cytoscape-wikipathways-app/blob/develop/WikiPathways-3.3.73.jar
-#installApp('WikiPathways')
 
 # TODO: should we set the following?
 #options(encoding = "UTF-8")
