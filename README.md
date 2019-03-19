@@ -15,16 +15,21 @@ git clone https://github.com/wikipathways/wikipathways2ndex.git
 cd wikipathways2ndex
 ```
 
-2. Create an account at [NDEx](http://ndexbio.org) if you don't have one. Then set your NDEx username and password:
+Temporary: until the updated version (>= 3.3.7-3) of the WikiPathways app for Cytoscape is put into production, do this:
+
+```sh
+rm "$HOME/CytoscapeConfiguration/3/apps/installed/WikiPathways-v*.jar"
+wget 'https://github.com/wikipathways/cytoscape-wikipathways-app/blob/develop/WikiPathways-3.3.73.jar?raw=true' -O "$HOME/CytoscapeConfiguration/3/apps/installed/WikiPathways-v3.3.7-3.jar"
+```
+
+2. Create an account at [NDEx](http://ndexbio.org) if you don't have one. Then set your NDEx username and password (perhaps in `~/.profile`):
 
 ```sh
 export NDEX_USER="username-for-your-ndex-account"
 export NDEX_PWD="password-for-your-ndex-account"
 ```
 
-3. In the file `pathway_ids.tsv`, specify the WikiPathways IDs you'd like to convert and export to NDEx.
-
-4. Execute: `./bulk2ndex.sh`
+3. Execute: `./bulk2ndex.sh`
 
 FYI: we used [`xvfb-run`](http://elementalselenium.com/tips/38-headless) as a dummy display to enable running Cytoscape in headless mode.
 
@@ -71,7 +76,7 @@ Put job running and detach:
 
 ```
 screen -R
-rm -rf cx; ./bulk2ndex.sh
+rm -rf cx; ./bulk2ndex.sh --reuse
 # Ctrl+a
 # d
 ```

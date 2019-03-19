@@ -341,6 +341,8 @@ wikipathways2ndex <- function(wikipathwaysID) {
 		message <- paste(result[["error"]], err, sep = ' ')
 		result[["error"]] <- message
 		result[["success"]] <- FALSE
+	}, interrupt = function(i) {
+		write(paste('Interrupted wikipathways2ndex.R:', i, sep = '\n'), stderr())
 	}, finally = {
 		closeSession(FALSE)
 	})
