@@ -21,6 +21,7 @@ in [
   dplyr
   here
   purrr
+  ndexr
   readr
   rjson
   tidyr
