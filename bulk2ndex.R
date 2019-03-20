@@ -24,7 +24,11 @@ tryCatch({
 	#pathway_ids <- get_value_by_key(getAnalysisCollection(), 'id')[20]
 	#pathway_ids <- get_value_by_key(getAnalysisCollection(), 'id')
 	#pathway_ids <- tail(get_value_by_key(getAnalysisCollection(), 'id'), -339)
-	pathway_ids <- get_value_by_key(getAnalysisCollection(), 'id')
+	#pathway_ids <- get_value_by_key(getAnalysisCollection(), 'id')
+	#pathway_ids <- c("WP26")
+
+	pathway_ids <- c("WP3929")
+	#pathway_ids <- c("WP3678")
 	for (pathway_ids_batch in split(pathway_ids, ceiling(seq_along(pathway_ids)/BATCH_SIZE))) {
 		print('pathway_ids_batch')
 		print(pathway_ids_batch)
@@ -39,6 +43,7 @@ tryCatch({
 }, interrupt = function(i) {
 	write(paste('Interrupted bulk2ndex.R:', i, sep = '\n'), stderr())
 	system("bash ./cytoscapestop.sh")
+	#stop('Interrupted bulk2ndex.R')
 }, finally = {
 	# do something
 })

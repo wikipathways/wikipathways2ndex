@@ -11,10 +11,11 @@ library(utf8)
 # Using dev version at present
 # https://github.com/wikipathways/cytoscape-wikipathways-app/blob/develop/WikiPathways-3.3.73.jar
 #installApp('WikiPathways')
-system("bash ./install_dev_wikipathways_app.sh")
+#system("bash ./install_dev_wikipathways_app.sh")
 
 source('./unify.R')
 
+NDEX_USER_UUID <- 'ae4b1027-1900-11e9-9fc6-0660b7976219'
 NDEX_USER <- Sys.getenv("NDEX_USER")
 NDEX_PWD <- Sys.getenv("NDEX_PWD")
 
@@ -69,32 +70,49 @@ is.blank <- function(x, false.triggers=FALSE){
 
 canBeInteger <- function(x) {grepl('^\\d+$', x)}
 
+updateNetworkTable <- function(currentNetworkTableColumns, columnName, columnValue) {
+	updatedNetworkTableColumns <- data.frame(columnName = columnValue, stringsAsFactors=FALSE)
+	row.names(updatedNetworkTableColumns) <- row.names(currentNetworkTableColumns)
+	loadTableData(updatedNetworkTableColumns, table = 'network', data.key.column = 'row.name', table.key.column = 'row.name')
+}
+
 wikipathways2ndex <- function(wikipathwaysID) {
 	result <- list()
 	tryCatch({
+		ndexVersion = format(Sys.time(), "%Y%m%d")
 		print(paste('Processing wikipathwaysID:', wikipathwaysID, '...'))
 
 		# TODO: why does net.suid != suid, as gotten later on?
 		net.suid <- commandsGET(paste0('wikipathways import-as-pathway id="', wikipathwaysID, '"'))
 
+		networks <- ndex_user_get_networksummary(ndexcon, userId=NDEX_USER_UUID)
+
+#		print('names(networks)')
+#		print(names(networks))
+#		print('head(networks, n = 1)')
+#		print(head(networks, n = 1))
+
 		# FROM WIKIPATHWAYS APP
 		networkTableColumns <- getTableColumns(table = 'network', columns = 'name,title,organism,description,pmids')
+#		print('networkTableColumns')
+#		print(networkTableColumns)
+
+#		networkTableColumns1 <- getTableColumns(table = 'network')
+#		print('networkTableColumns1')
+#		print(networkTableColumns1)
+
 		title <- networkTableColumns[["title"]]
 		organism <- networkTableColumns[["organism"]]
 		description <- networkTableColumns[["description"]]
 		#pmids <- as.integer(unlist(strsplit(networkTableColumns[["pmids"]], "\\s*,\\s*")))
 		pmids <- NA
 		raw_pmids <- networkTableColumns[["pmids"]]
-		print('raw_pmids')
-		print(raw_pmids)
 		if (is.blank(raw_pmids)) {
-			write("Warning: pmids not found by cytoscape app in wikipathways2ndex.R:", stderr())
+			write("Warning: pmids not found by cytoscape app in wikipathways2ndex.R", stderr())
 		} else {
 			#pmids <- as.integer(unlist(strsplit(raw_pmids, "\\s*,\\s*")))
 			pmids <- as.integer(Filter(canBeInteger, unlist(strsplit(raw_pmids, "\\s*,\\s*"))))
 		}
-		print('pmids')
-		print(pmids)
 
 		# FROM WEBSERVICE
 		pathwayInfo <- getPathwayInfo(wikipathwaysID)
@@ -102,16 +120,16 @@ wikipathways2ndex <- function(wikipathwaysID) {
 		#url <- pathwayInfo[2]
 		if (is.blank(title)) {
 			title <- pathwayInfo[3]
-			write("Warning: title not found by cytoscape app but was by getPathwayInfo in wikipathways2ndex.R:", stderr())
+			write(paste("Warning: title not found by cytoscape app but was by getPathwayInfo in wikipathways2ndex.R:", title), stderr())
 		}
 		if (is.blank(organism)) {
 			organism <- pathwayInfo[4]
-			write("Warning: organism not found by cytoscape app but was by getPathwayInfo in wikipathways2ndex.R:", stderr())
+			write(paste("Warning: organism not found by cytoscape app but was by getPathwayInfo in wikipathways2ndex.R:", organism), stderr())
 		}
-		version <- pathwayInfo[5]
+		wikipathwaysVersion <- pathwayInfo[5]
 
 		name <- paste(wikipathwaysID, title, organism, sep = ' - ')
-		wikipathwaysIRI = paste0('http://identifiers.org/wikipathways/', wikipathwaysID, '_r', version)
+		wikipathwaysIRI = paste0('http://identifiers.org/wikipathways/', wikipathwaysID, '_r', wikipathwaysVersion)
 
 		renameNetwork(name)
 
@@ -122,19 +140,23 @@ wikipathways2ndex <- function(wikipathwaysID) {
 		filepath_san_ext <- file.path(CX_OUTPUT_DIR, filename)
 
 		if (is.blank(description)) {
+			write("Warning: description not found by cytoscape app in wikipathways2ndex.R", stderr())
 			pathway_latin1 <- getPathway(wikipathwaysID)
 			Encoding(pathway_latin1) <- "latin1"
 			pathway <- as_utf8(pathway_latin1)
 
 			# if we get an error when trying to get description, we skip it and continue.
 			description <- tryCatch({
+				write("Trying to get description by getPathway in wikipathways2ndex.R", stderr())
 				# TODO: can't parse GPML for WP23. Complains about encoding.
 				pathwayParsed <- xmlTreeParse(pathway, asText = TRUE, useInternalNodes = TRUE, getDTD=FALSE)
 				# TODO: look into formatting description as HTML. Is the string wikitext?
 				# For example, '\n' could be '<br>'
-				xmlSerializeHook(getNodeSet(pathwayParsed,
+				descriptionCandidate <- xmlSerializeHook(getNodeSet(pathwayParsed,
 							 "/gpml:Pathway/gpml:Comment[@Source='WikiPathways-description']/text()",
 							 c(gpml = "http://pathvisio.org/GPML/2013a")))[[1]]
+				write(descriptionCandidate, stderr())
+				descriptionCandidate
 			}, warning = function(w) {
 				write(paste("Warning getting description in wikipathways2ndex.R:", w, sep = '\n'), stderr())
 				return('')
@@ -144,15 +166,47 @@ wikipathways2ndex <- function(wikipathwaysID) {
 			}, finally = {
 				# Do something
 			})
-			write(paste0("Warning: description ", description, " not found by cytoscape app but was by getPathway in wikipathways2ndex.R:"), stderr())
+			write(paste("Warning: description not found by cytoscape app but was by getPathway in wikipathways2ndex.R:", description, sep = '\n'), stderr())
+			#loadTableData(data.frame(c("description",), c(description,)), table = 'network')
+			#loadTableData(data.frame("description" = c(description,),), table = 'network')
+			#loadTableData(data.frame("description" = c(description), "dummy" = c("abc"), ), table = 'network')
+			#networkTableColumnsCandidate <- data.frame("name" = name, "description" = description)
+
+
+			print('networkTableColumns')
+			print(networkTableColumns)
+
+			#updateNetworkTable(networkTableColumns, "description", "mydescription")
+
+			networkTableColumnsCandidate <- data.frame("name" = name, "description" = "mydescription", stringsAsFactors=FALSE)
+			#row.names(networkTableColumnsCandidate) <- row.names(networkTableColumns)
+			#row.names(networkTableColumns) <- c(80)
+			row.names(networkTableColumnsCandidate) <- c(440)
+
+			print('networkTableColumnsCandidate')
+			print(networkTableColumnsCandidate)
+
+			print('loading...')
+			#loadTableData(networkTableColumnsCandidate, table = 'network', data.key.column = 'row.names', table.key.column = 'row.names')
+			loadTableData(networkTableColumnsCandidate, table = 'network', data.key.column = 'name', table.key.column = 'name')
+			#loadTableData(networkTableColumnsCandidate, table = 'network')
+
+#			networkTableColumnsAfter2 <- getTableColumns(table = 'network')
+#			print('networkTableColumnsAfter2')
+#			print(networkTableColumnsAfter2)
+
+			networkTableColumnsAfter <- getTableColumns(table = 'network', columns = 'name,title,organism,description,pmids')
+			print('networkTableColumnsAfter')
+			print(networkTableColumnsAfter)
+
 		}
 
 		# TODO: should we reference DataNodes of type Pathway with WithPathways IDs as NDEx subnetworks?
 		metadata <- list(author = 'WikiPathways team',
 				 wikipathwaysIRI = makeHtmlLink(wikipathwaysIRI),
 				 wikipathwaysID = wikipathwaysID,
-				 wikipathwaysVersion = version,
-				 version = format(Sys.time(), "%Y%m%d"),
+				 wikipathwaysVersion = wikipathwaysVersion,
+				 version = ndexVersion,
 				 rightsHolder = 'WikiPathways',
 				 # TODO: the docs say to make our own HTML for CC0.
 				 # see http://home.ndexbio.org/publishing-in-ndex/#rights
@@ -195,7 +249,7 @@ wikipathways2ndex <- function(wikipathwaysID) {
 #		networkTableColumns <- getTableColumns(table = 'network')
 #		print('networkTableColumns')
 #		print(networkTableColumns)
-		#networkTableColumnsUpdated <- data.frame("version" = version, "organism" = organism, )
+		#networkTableColumnsUpdated <- data.frame("version" = ndexVersion, "organism" = organism, )
 		#print('networkTableColumnsUpdated')
 		#print(networkTableColumnsUpdated)
 		#loadTableData(networkTableColumnsUpdated, table = 'network')
@@ -226,19 +280,22 @@ wikipathways2ndex <- function(wikipathwaysID) {
 		# exportNetworkToNDEx only submits to production server.
 		suid <- getNetworkSuid(NULL, "http://localhost:1234/v1")
 
-		userUUID <- 'ae4b1027-1900-11e9-9fc6-0660b7976219'
 		#networks <- ndex_find_networks(ndexcon, searchString=title, owner='ariutta')
 		# http://dev2.ndexbio.org/#/user/ae4b1027-1900-11e9-9fc6-0660b7976219
 		#networks <- ndex_find_networks(ndexcon, searchString=title)
 		#networks <- ndex_find_networks(ndexcon, searchString=title, accountName='ae4b1027-1900-11e9-9fc6-0660b7976219')
 		#networks <- ndex_find_networks(ndexcon, accountName='ae4b1027-1900-11e9-9fc6-0660b7976219')
 		#networks <- ndex_find_networks(ndexcon, accountName='ariutta')
-		#networks <- ndex_user_get_showcase(ndexcon, userId=userUUID)
-		networks <- ndex_user_get_networksummary(ndexcon, userId=userUUID)
+		#networks <- ndex_user_get_showcase(ndexcon, userId=NDEX_USER_UUID)
+		networks <- ndex_user_get_networksummary(ndexcon, userId=NDEX_USER_UUID)
 
 		matchingNetworks <- as_tibble(networks) %>%
 			filter(grepl(paste0('wikipathways\\/', wikipathwaysID), wikipathwaysID) | grepl(paste0(wikipathwaysID, '\\s'), name)) %>%
+			filter(version == ndexVersion) %>%
 			filter(!isDeleted)
+
+		print('matchingNetworks')
+		print(matchingNetworks)
 
 		matchingNetworkCount <- length(matchingNetworks)
 		if (matchingNetworkCount > 0 && !is.blank(matchingNetworks)) {
@@ -265,17 +322,20 @@ wikipathways2ndex <- function(wikipathwaysID) {
 				# Do something
 			})
 
-			write('TODO: fix error about "type null not supported"', stderr())
-#			networkId <- ndex_update_network(ndexcon, rcx, networkId)
-#			print('networkId after')
-#			print(networkId)
-#
-#			result[["error"]] <- NA
-#			result[["success"]] <- TRUE
+			print('networkId before')
+			print(networkId)
+			networkId <- ndex_update_network(ndexcon, rcx, networkId)
+			#ndex_delete_network(ndexcon, networkId)
+			print('networkId after')
+			print(networkId)
 
-			message <- 'Error: "type null not supported"'
-			result[["error"]] <- message
-			result[["success"]] <- FALSE
+			result[["error"]] <- NA
+			result[["success"]] <- TRUE
+
+#			write('TODO: fix error about "type null not supported"', stderr())
+#			message <- 'Error: "type null not supported"'
+#			result[["error"]] <- message
+#			result[["success"]] <- FALSE
 
 			result[["response"]] <- networkId
 
@@ -343,7 +403,8 @@ wikipathways2ndex <- function(wikipathwaysID) {
 		result[["error"]] <- message
 		result[["success"]] <- FALSE
 	}, interrupt = function(i) {
-		write(paste('Interrupted wikipathways2ndex.R:', i, sep = '\n'), stderr())
+		#write(paste('Interrupted wikipathways2ndex.R:', i, sep = '\n'), stderr())
+		stop('Interrupted wikipathways2ndex.R')
 	}, finally = {
 		closeSession(FALSE)
 	})

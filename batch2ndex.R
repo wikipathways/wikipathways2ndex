@@ -30,7 +30,7 @@ batch2ndex <- function(pathway_ids_batch) {
 		write(paste('Interrupted batch2ndex.R:', i, sep = '\n'), stderr())
 	}, finally = {
 		deleteAllNetworks()
-		system("bash ./cytoscapestop.sh")
+		#system("bash ./cytoscapestop.sh")
 	})
 	return(results)
 }
