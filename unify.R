@@ -5,11 +5,15 @@ library(RCy3)
 #############################################################
 # NOTE: this just does Ensembl -> HGNC:
 #   mapTableColumn('Ensembl', organism, 'Ensembl', 'HGNC')
-# unify2hgnc_from_xrefid.R could be the basis for creating
-# code for unification for other sources and targets.
+# This file:
+#   ./maybe-useful/unify2hgnc_from_xrefid.R
+# could be a starting point for creating code for unification
+# for other sources and targets.
 #############################################################
 
 unify <- function(organism) {
+	sourceColumnName <- 'Ensembl'
+	targetColumnName <- 'HGNC'
 	# TODO: it appears I can't run mapTableColumn for mouse and human pathways in
 	# the same batch. Any of these combos work:
 	# * just WP1 (mouse)
@@ -17,9 +21,11 @@ unify <- function(organism) {
 	# * WP241, WP550, WP554 (human)
 	# but this fails:
 	# * WP1 (mouse) and WP241 (human)
-	if (organism == 'Homo sapiens') {
-		mapTableColumn('Ensembl', organism, 'Ensembl', 'HGNC')
+	networkTableColumnNames <- getTableColumnNames(table = 'network')
+	if (organism == 'Homo sapiens' && (sourceColumnName %in% networkTableColumnNames)) {
+		mapTableColumn(sourceColumnName, organism, sourceColumnName, targetColumnName)
 
+		# TODO: who do we use targetColumnName instead of HGNC below?
 		hgncified <- mutate(as_tibble(getTableColumns()), name=ifelse(is.na(HGNC), name, HGNC)) %>%
 			select('SUID', 'name')
 
@@ -38,6 +44,6 @@ unify <- function(organism) {
 		row.names(hgncified_df) <- hgncified_df[["SUID"]]
 		loadTableData(hgncified_df, table.key.column = 'SUID')
 
-		deleteTableColumn('HGNC')
+		deleteTableColumn(targetColumnName)
 	}
 }

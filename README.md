@@ -28,7 +28,9 @@ export NDEX_USER="username-for-your-ndex-account"
 export NDEX_PWD="password-for-your-ndex-account"
 ```
 
-3. Execute: `./bulk2ndex.sh`
+3. Execute: `rm -rf cx; ./export.R AnalysisCollection ndex`
+
+To see more options, run `./export.R --help`
 
 FYI: we used [`xvfb-run`](http://elementalselenium.com/tips/38-headless) as a dummy display to enable running Cytoscape in headless mode.
 

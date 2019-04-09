@@ -20,6 +20,7 @@ in [
   rWikiPathways
   dplyr
   here
+  optparse
   purrr
   ndexr
   readr

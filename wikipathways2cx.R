@@ -7,6 +7,12 @@ library(tidyr)
 
 source('./unify.R')
 
+# Using dev version at present
+# https://github.com/wikipathways/cytoscape-wikipathways-app/blob/develop/WikiPathways-3.3.73.jar
+#installApp('WikiPathways')
+#system("bash ./install_dev_wikipathways_app.sh")
+#installApp('WikiPathways')
+
 # TODO: where should we output these files? We should allow for specifying the output location.
 CX_OUTPUT_DIR = here('cx')
 if (!dir.exists(CX_OUTPUT_DIR)) {
@@ -20,29 +26,37 @@ if (!dir.exists(CX_OUTPUT_DIR)) {
 	}
 }
 
-installApp('WikiPathways')
+wikipathways2cx <- function(wikipathwaysID) {
+	net.suid <- commandsGET(paste0('wikipathways import-as-pathway id="', wikipathwaysID, '"'))
 
-wikipathways2cx <- function(wikipathwaysId) {
-	net.suid <- commandsGET(paste0('wikipathways import-as-pathway id="', wikipathwaysId, '"'))
-
-	pathwayInfo <- getPathwayInfo(wikipathwaysId)
+	pathwayInfo <- getPathwayInfo(wikipathwaysID)
 	print('pathwayInfo')
 	print(pathwayInfo)
 
-	ontologyTerms <- getOntologyTerms(wikipathwaysId)
+	ontologyTerms <- getOntologyTerms(wikipathwaysID)
 	diseaseOntologyTerms <- unlist(lapply(ontologyTerms[unname(unlist(lapply(ontologyTerms, function(x) {x["ontology"] == 'Disease'})))], function(x) {x[['name']]}))
 	print('diseaseOntologyTerms')
 	print(diseaseOntologyTerms)
     
 	# This code gets username, but not the actual name of the user.
-#	pathwayHistory <- getPathwayHistory(wikipathwaysId, 19700101)
+#	pathwayHistory <- getPathwayHistory(wikipathwaysID, 19700101)
 #	print('pathwayHistory')
 #	print(pathwayHistory)
 
 	networkName <- getNetworkName()
 	organism <- gsub(".*\\s\\-\\s", "", networkName)
-	filename <- paste0(wikipathwaysId, '__', gsub("_-_", "__", gsub(" ", "_", networkName)))
-	filepath_san_ext <- file.path(CX_OUTPUT_DIR, filename)
+	filename <- paste0(wikipathwaysID, '__', gsub("_-_", "__", gsub(" ", "_", networkName)))
+	# TODO: when we export to CX via Cytoscape and try opening that same file with the same filepath,
+       	# fromJSON gives an error for non-ASCII filepaths, e.g., any incl/ characters like Greek alpha: α
+	# WP4566__Translational_regulation_by_PDGFRα__Homo_sapien
+	#filepath_san_ext <- file.path(CX_OUTPUT_DIR, filename)
+
+	filepath_san_ext_raw <- file.path(CX_OUTPUT_DIR, filename)
+	Encoding(filepath_san_ext_raw) <- "UTF-8"
+	#filepath_san_ext <- iconv(filepath_san_ext_raw, 'UTF-8', 'ASCII', "byte")
+	#filepath_san_ext <- iconv(filepath_san_ext_raw, 'UTF-8', 'ASCII', sub = "?")
+	sub_char <- "?"
+	filepath_san_ext <- gsub(paste0('\\', sub_char, '\\', sub_char), sub_char, iconv(filepath_san_ext_raw, 'UTF-8', 'ASCII', sub = sub_char))
 
 	networkTableColumns <- getTableColumns(table = 'network')
 	print('networkTableColumns')
@@ -53,18 +67,14 @@ wikipathways2cx <- function(wikipathwaysId) {
 	loadTableData(networkTableColumnsUpdated, table = 'network')
 
 	# save as png
-	exportImage(here(filename), 'PNG', zoom=200)
-	# TODO:: It appears the file must be in the cwd. If I do this:
-	#exportImage(here('cx', filename), 'PNG', zoom=200)
-	# I get this error:
-	# parse error: Invalid numeric literal at line 1, column 5
+	exportImage(filepath_san_ext, 'PNG', zoom=200)
 
 	unify(organism)
 
 	filepathCx <- paste0(filepath_san_ext, '.cx')
 	filepathCys <- paste0(filepath_san_ext, '.cys')
 	#closeSession<-function(TRUE, filename=filepathCys)
-	closeSession(TRUE, filename=filepath_san_ext)
+	closeSessionName <- closeSession(TRUE, filename=filepath_san_ext)
 	openSession(file.location=filepathCys)
 
 	# save as cx
@@ -72,19 +82,19 @@ wikipathways2cx <- function(wikipathwaysId) {
 	# TODO: right now, exportResponse only has one named item: 'file'.
 	# But it should also include the status info from the cx. 
 	# Then w could possibly just use exportResponse instead of making the
-	# 'response' list further below.
+	# 'result' list further below.
 
-	response <- list(file=filepathCx)
+	result <- list(file=filepathCx, name=networkName, response=exportResponse[["file"]])
 
 	cx <- fromJSON(file=filepathCx)
 	success <- tail(cx, n=1)[[1]]$status[[1]]$success
-	response[["success"]] <- success
+	result[["success"]] <- success
 	if (!success) {
-		response[["error"]] <- tail(cx, n=1)[[1]]$status[[1]]$error
+		result[["error"]] <- tail(cx, n=1)[[1]]$status[[1]]$error
 	} else {
-		response[["error"]] <- NA
+		result[["error"]] <- NA
 	}
 
 	closeSession(FALSE)
-	return(response)
+	return(result)
 }
