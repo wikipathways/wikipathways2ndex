@@ -20,9 +20,23 @@ library(utf8)
 source('./get_citation.R')
 source('./unify.R')
 
-NDEX_USER_UUID <- 'ae4b1027-1900-11e9-9fc6-0660b7976219'
 NDEX_USER <- Sys.getenv("NDEX_USER")
 NDEX_PWD <- Sys.getenv("NDEX_PWD")
+
+# for test
+#NDEX_HOST="dev2.ndexbio.org"
+#NETWORKSET_ID <- '7dbe0e40-5c05-11e9-831d-0660b7976219'
+#NDEX_USER_UUID <- 'ae4b1027-1900-11e9-9fc6-0660b7976219'
+
+# for production
+NDEX_HOST="ndexbio.org"
+NETWORKSET_ID <- '453c1c63-5c10-11e9-9f06-0ac135e8bacf'
+#NDEX_USER_UUID <- '3fa85f64-5717-4562-b3fc-2c963f66afa6'
+NDEX_USER_UUID <- '363f49e0-4cf0-11e9-9f06-0ac135e8bacf'
+print('NDEX_USER')
+print(NDEX_USER)
+
+NDEX_SERVER_URL=paste0("http://", NDEX_HOST, "/v2")
 
 ndexcon <- NA
 if (NDEX_USER == '' || NDEX_PWD == '') {
@@ -33,7 +47,9 @@ if (NDEX_USER == '' || NDEX_PWD == '') {
 	write('export NDEX_PWD=\'your-ndex-password\'', stderr())
 	stop(message)
 } else {
-	ndexcon <- ndex_connect(username=NDEX_USER, password=NDEX_PWD, host="dev2.ndexbio.org", ndexConf=ndex_config$Version_2.0)
+	ndexcon <- ndex_connect(username=NDEX_USER, password=NDEX_PWD, host=NDEX_HOST, ndexConf=ndex_config$Version_2.0)
+	print('ndexcon')
+	print(ndexcon)
 }
 
 # TODO: where should we output these files? We should allow for specifying the output location.
@@ -256,12 +272,6 @@ wikipathways2ndex <- function(wikipathwaysID) {
 		emptyNodes <- as_tibble(tableColumnsPreCys) %>%
 			filter(is.na(GraphID) | is.null(GraphID) | GraphID == "")
 
-		print('emptyNodes')
-		print(emptyNodes)
-
-		print('emptyNodes$SUID')
-		print(emptyNodes$SUID)
-
 		CYTOSCAPE_NA<-""
 		tableColumnsCorrected <- as.data.frame(
 						       as_tibble(tableColumnsPreCys) %>%
@@ -281,30 +291,14 @@ wikipathways2ndex <- function(wikipathwaysID) {
 		deleteSelectedNodes()
 
 		tableColumnsCorrectedLoaded <- getTableColumns()
-		print('tableColumnsCorrectedLoaded$GraphID')
-		print(tableColumnsCorrectedLoaded$GraphID)
-
-#		#edgeTableColumns <- getTableColumns(table = 'edge', columns = 'name,title,organism,description,pmids')
-#		edgeTableColumns <- getTableColumns(table = 'edge')
-#		print('edgeTableColumns')
-#		print(edgeTableColumns)
-#		deleteAllNetworks()
-#		createNetworkFromDataFrames(nodes = tableColumnsCorrected, edges = edgeTableColumns, title = name)
 
 		result[["name"]] <- name
 
-		#exportResponse <- exportNetworkToNDEx(NDEX_USER, NDEX_PWD, isPublic=TRUE)
-		# NOTE: we need to use this in order to submit to the test/dev2 server.
-		# exportNetworkToNDEx only submits to production server.
 		suid <- getNetworkSuid(NULL, "http://localhost:1234/v1")
-
-		#networkTableColumnNames <- getTableColumnNames(table = 'network')
-		#print(networkTableColumnNames)
 
 		# TODO: should we actually delete these?
 		deleteTableColumn('title', table = 'network')
 		deleteTableColumn('pmids', table = 'network')
-#		#deleteTableColumn('pmids', table = 'network', network = suid)
 
 		networks <- ndex_user_get_networksummary(ndexcon, userId=NDEX_USER_UUID)
 
@@ -314,69 +308,14 @@ wikipathways2ndex <- function(wikipathwaysID) {
 			filter(!isDeleted)
 
 		matchingNetworkCount <- nrow(matchingNetworks)
-#		if (matchingNetworkCount > 0 && !is.blank(matchingNetworks)) {
-#			print('Deleting...')
-#			if (matchingNetworkCount > 1) {
-#				write(paste0("Warning ", matchingNetworkCount, " matching networks (just 0 or 1 expected) in wikipathways2ndex.R:"), stderr())
-#			}
-#			networkId <- (matchingNetworks %>% head(1))[["externalId"]]
-#			# if we get an error when trying to make editable, we ignore it and continue.
-#			tryCatch({
-#				ndex_network_set_systemProperties(ndexcon, networkId, readOnly=FALSE)
-#			}, warning = function(w) {
-#				write(paste("Warning making network editable in wikipathways2ndex.R:", w, sep = '\n'), stderr())
-#				NA
-#			}, error = function(err) {
-#				write(paste("Error making network editable in wikipathways2ndex.R:", err, sep = '\n'), stderr())
-#				NA
-#			}, finally = {
-#				# Do something
-#			})
-#
-#			# if we get an error when trying to delete, we ignore it and continue.
-#			tryCatch({
-#				ndex_delete_network(ndexcon, networkId)
-#			}, warning = function(w) {
-#				write(paste("Warning when trying to update in wikipathways2ndex.R:", w, sep = '\n'), stderr())
-#				NA
-#			}, error = function(err) {
-#				write(paste("Error when trying to update in wikipathways2ndex.R:", err, sep = '\n'), stderr())
-#				NA
-#			}, finally = {
-#				# Do something
-#			})
-#		}
 
-		# TODO: this isn't working, so I made it impossible to enter for now
-		#if (matchingNetworkCount > 0 && !is.blank(matchingNetworks)) {}
-		if (TRUE==FALSE && matchingNetworkCount > 0 && !is.blank(matchingNetworks)) {
+		if (matchingNetworkCount > 0 && !is.blank(matchingNetworks)) {
 			print('Updating...')
 			if (matchingNetworkCount > 1) {
-				write(paste0("Warning ", matchingNetworkCount, " matching networks (just 0 or 1 expected) in wikipathways2ndex.R:"), stderr())
+				write(paste0("Warning ", matchingNetworkCount, " matching networks (just 0 or 1 expected) in wikipathways2ndex.R. Using first. :"), stderr())
 			}
 			networkId <- (matchingNetworks %>% head(1))[["externalId"]]
-			# get cx and convert to rcx
-			exportNetwork(filename=filepath_san_ext, type='CX')
-			cx <- readLines(filepathCx, warn=FALSE)
-#			print('cx')
-#			print(cx)
 
-			rcx_before <- ndex_get_network(ndexcon, networkId)
-			#print('rcx_before initial')
-			#print(str(rcx_before, max.level = 2))
-#			rcx_before <- rcx_asNewNetwork(rcx_before)
-#			print('rcx_before cleaned')
-#			print(rcx_before)
-
-#			rcx <- rcx_fromJSON(cx)
-#			print('rcx')
-#			print(rcx)
-#			print('typeof(rcx)')
-#			print(typeof(rcx))
-#			print('class(rcx)')
-#			print(class(rcx))
-
-			# URL: [ http://dev2.ndexbio.org/v2/network/b7ce4447-5b15-11e9-831d-0660b7976219/systemproperty ]
 			# if we get an error when trying to make editable, we ignore it and continue.
 			tryCatch({
 				ndex_network_set_systemProperties(ndexcon, networkId, readOnly=FALSE)
@@ -390,72 +329,28 @@ wikipathways2ndex <- function(wikipathwaysID) {
 				# Do something
 			})
 
-			print('networkId before')
-			print(networkId)
-			#rcx_before <- rcx_asNewNetwork(rcx_before)
-			#print('rcx_before asNewNetwork')
-			#print(str(rcx_before, max.level = 2))
-			#print('rcx_before$metaData$properties')
-			#print(rcx_before$metaData$properties)
+#			###################################################################
+#			# The code below is a kludge, because update isn't working properly
+#			###################################################################
+			print('Deleting...')
 
-			rcx_before$properties[rcx_before$properties == NULL] <- ""
-#			rcx_before$properties[rcx_before$properties == "NULL"] <- ""
-#			rcx_before$properties[rcx_before$properties == "null"] <- ""
-
-			#print('rcx_before de-nulled')
-			#print(str(rcx_before, max.level = 2))
-
-			#networkId <- ndex_update_network(ndexcon, rcx, networkId)
-			rcx_before <- rcx_updateMetaData(rcx_before)
-			print('rcx_before updated metadata')
-			print(str(rcx_before, max.level = 2))
-			#networkId <- ndex_update_network(ndexcon, rcx_before)
-			networkId <- ndex_update_network(ndexcon, rcx_before, networkId)
-
-#			# if we get an error when trying to update, we ignore it and continue.
-#			tryCatch({
-#				#ndex_delete_network(ndexcon, networkId)
-#			}, warning = function(w) {
-#				write(paste("Warning when trying to update in wikipathways2ndex.R:", w, sep = '\n'), stderr())
-#				NA
-#			}, error = function(err) {
-#				write(paste("Error when trying to update in wikipathways2ndex.R:", err, sep = '\n'), stderr())
-#				NA
-#			}, finally = {
-#				# Do something
-#			})
-
-
-			print('networkId after')
-			print(networkId)
-
-			result[["error"]] <- NA
-			result[["success"]] <- TRUE
-
-#			write('TODO: fix error about "type null not supported"', stderr())
-#			message <- 'Error: "type null not supported"'
-#			result[["error"]] <- message
-#			result[["success"]] <- FALSE
-
-			result[["response"]] <- networkId
-
-			# if we get an error when trying to make readOnly, we ignore it and continue.
+			# if we get an error when trying to delete, we ignore it and continue.
 			tryCatch({
-				ndex_network_set_systemProperties(ndexcon, networkId, readOnly=TRUE, visibility="PUBLIC", showcase=TRUE)
+				ndex_delete_network(ndexcon, networkId)
 			}, warning = function(w) {
-				write(paste("Warning making network readOnly in wikipathways2ndex.R:", w, sep = '\n'), stderr())
+				write(paste("Warning when trying to update in wikipathways2ndex.R:", w, sep = '\n'), stderr())
 				NA
 			}, error = function(err) {
-				write(paste("Error making network readOnly in wikipathways2ndex.R:", err, sep = '\n'), stderr())
+				write(paste("Error when trying to update in wikipathways2ndex.R:", err, sep = '\n'), stderr())
 				NA
 			}, finally = {
 				# Do something
 			})
-		} else {
-			exportNetwork(filename=filepath_san_ext, type='CX')
-			print('Creating...')
+
+			# TODO:: the code below is copied from the "else" further below in this file
+			print('Re-creating...')
 			res <- cyrestPOST(paste('networks', suid, sep = '/'),
-				      body = list(serverUrl="http://dev2.ndexbio.org/v2",
+				      body = list(serverUrl=NDEX_SERVER_URL,
 						  username=NDEX_USER,
 						  password=NDEX_PWD,
 						  metadata=metadata,
@@ -472,29 +367,133 @@ wikipathways2ndex <- function(wikipathwaysID) {
 			} else {
 				result[["error"]] <- NA
 				result[["success"]] <- TRUE
-				# if we get an error when trying to make readOnly, we ignore it and continue.
-				tryCatch({
-					ndex_network_set_systemProperties(ndexcon, networkId, readOnly=TRUE, visibility="PUBLIC", showcase=TRUE)
-				}, warning = function(w) {
-					write(paste("Warning making network readOnly in wikipathways2ndex.R:", w, sep = '\n'), stderr())
-					NA
-				}, error = function(err) {
-					write(paste("Error making network readOnly in wikipathways2ndex.R:", err, sep = '\n'), stderr())
-					NA
-				}, finally = {
-					# Do something
-				})
+			}
+
+#			###################################################################
+#			# None of the methods below work properly.
+#			# 1. cyrestPUT gives an error about encoding
+#			# 2. produces a network that never displays
+#			# 3. produces a  Cytoscape collection instead of an NDEx network
+#			###################################################################
+#
+#			# 1. Update using existing libraries
+#
+#			#exportResponse <- updateNetworkInNDEx(NDEX_USER, NDEX_PWD, isPublic=TRUE)
+#			# NOTE: we need to something else in order to submit to the test/dev2 server.
+#			# updateNetworkInNDEx only submits to production server.
+#
+#			res <- cyrestPUT(paste('networks', suid, sep = '/'),
+#				      body = list(serverUrl=NDEX_SERVER_URL,
+#						  username=NDEX_USER,
+#						  password=NDEX_PWD,
+#						  metadata=metadata,
+#						  isPublic=TRUE),
+#					  base.url = "http://localhost:1234/cyndex2/v1")
+#
+#			# get cx and convert to rcx
+#			# 2. Try getting it by posting to NDEx and downloading
+#			res <- cyrestPOST(paste('networks', suid, sep = '/'),
+#				      body = list(serverUrl=NDEX_SERVER_URL,
+#						  username=NDEX_USER,
+#						  password=NDEX_PWD,
+#						  metadata=metadata,
+#						  isPublic=TRUE),
+#				      base.url = "http://localhost:1234/cyndex2/v1")
+#			networkIdUpdatePlaceholder <- res$data$uuid
+#			rcx <- ndex_get_network(ndexcon, networkIdUpdatePlaceholder)
+#			# We don't need it any more
+#			ndex_delete_network(ndexcon, networkIdUpdatePlaceholder)
+#			rcx$networkAttributes$d[is.na(rcx$networkAttributes$d)] <- "string"
+#			rcx$nodeAttributes$d[is.na(rcx$nodeAttributes$d)] <- "string"
+#			rcx$edgeAttributes$d[is.na(rcx$edgeAttributes$d)] <- "string"
+#			rcx$cyVisualProperties$applies_to[is.na(rcx$cyVisualProperties$applies_to)] <- 0
+#			rcx <- rcx_updateMetaData(rcx)
+#
+##			# 3. Try getting it by exporting as CX and opening
+##			#    This method isn't working. It gives this message:
+##			#    "This network is part of a Cytoscape collection and cannot be operated on or edited in NDEx."
+##			exportNetwork(filename=filepath_san_ext, type='CX')
+##			cx <- readLines(filepathCx, warn=FALSE)
+##			rcx <- rcx_fromJSON(cx)
+##			#rcx <- rcx_asNewNetwork(rcx)
+##			rcx$networkAttributes$d[is.na(rcx$networkAttributes$d)] <- "string"
+##			rcx$nodeAttributes$d[is.na(rcx$nodeAttributes$d)] <- "string"
+##			rcx$edgeAttributes$d[is.na(rcx$edgeAttributes$d)] <- "string"
+##			rcx$cyTableColumn$d[is.na(rcx$cyTableColumn$d)] <- "string"
+##			rcx$cyTableColumn$s[is.na(rcx$cyTableColumn$s)] <- 0
+##			rcx$networkAttributes$s[is.na(rcx$networkAttributes$s)] <- 0
+##			rcx$nodeAttributes$s[is.na(rcx$nodeAttributes$s)] <- 0
+##			rcx$edgeAttributes$s[is.na(rcx$edgeAttributes$s)] <- 0
+##			rcx$cyVisualProperties$applies_to[is.na(rcx$cyVisualProperties$applies_to)] <- 0
+##			rcx$cySubNetworks <- NULL
+##			rcx$cyViews <- NULL
+##			rcx$cyNetworkRelations <- NULL
+##			rcx$cyTableColumn <- NULL
+##			rcx$cyVisualProperties$view <- NULL
+##			rcx$cartesianLayout$view <- NULL
+##			rcx <- rcx_updateMetaData(rcx)
+#
+#			print('rcx B')
+#			print(str(rcx, max.level = 2))
+#			networkId <- ndex_update_network(ndexcon, rcx, networkId)
+#			#ndex_create_network(ndexcon, rcx)
+#
+#			result[["error"]] <- NA
+#			result[["success"]] <- TRUE
+#			result[["response"]] <- networkId
+		} else {
+			#exportResponse <- exportNetworkToNDEx(NDEX_USER, NDEX_PWD, isPublic=TRUE)
+			# NOTE: we need to use cyrestPOST in order to submit to the test/dev2 server.
+			# exportNetworkToNDEx only submits to production server.
+			exportNetwork(filename=filepath_san_ext, type='CX')
+			print('Creating...')
+			res <- cyrestPOST(paste('networks', suid, sep = '/'),
+				      body = list(serverUrl=NDEX_SERVER_URL,
+						  username=NDEX_USER,
+						  password=NDEX_PWD,
+						  metadata=metadata,
+						  isPublic=TRUE),
+					  base.url = "http://localhost:1234/cyndex2/v1")
+
+			networkId <- res$data$uuid
+			result[["response"]] <- networkId
+			resErrors <- res$errors
+			if (length(resErrors) > 0) {
+				message <- paste(resErrors, sep = ' ')
+				result[["error"]] <- message
+				result[["success"]] <- FALSE
+			} else {
+				result[["error"]] <- NA
+				result[["success"]] <- TRUE
 			}
 		}
 
-	#		# TODO: how do we add this pathway to a network set?
-	#		networkSetID <- '368aff6c-45ef-11e9-9fc6-0660b7976219'
-	#		resNetworkSet <- cyrestPOST(paste('networkset', networkSetID, 'members', sep = '/'),
-	#			      body = list(serverUrl="http://dev2.ndexbio.org/v2",
-	#					  username=NDEX_USER,
-	#					  password=NDEX_PWD,
-	#					  networks=list(uuid)),
-	#			      base.url = "http://localhost:1234/cyndex2/v1")
+		r <- POST(
+			  paste(NDEX_SERVER_URL, 'networkset', NETWORKSET_ID, 'members', sep = '/'),
+			  body = list(networkId),
+			  encode = "json",
+			  authenticate(NDEX_USER, NDEX_PWD)
+			  )
+
+		# if we get an error when trying to make readOnly, we ignore it and continue.
+		tryCatch({
+			# the ndexr package doesn't support index_level="ALL", so I need to use httr instead
+			#ndex_network_set_systemProperties(ndexcon, networkId, readOnly=TRUE, visibility="PUBLIC", showcase=TRUE)
+			r <- PUT(
+				 paste(NDEX_SERVER_URL, 'network', networkId, 'systemproperty', sep = '/'),
+				 body = list(readOnly=TRUE, visibility="PUBLIC", showcase=TRUE, index_level="ALL"),
+				 encode = "json",
+				 authenticate(NDEX_USER, NDEX_PWD)
+				 )
+		}, warning = function(w) {
+			write(paste("Warning making network readOnly in wikipathways2ndex.R:", w, sep = '\n'), stderr())
+			NA
+		}, error = function(err) {
+			write(paste("Error making network readOnly in wikipathways2ndex.R:", err, sep = '\n'), stderr())
+			NA
+		}, finally = {
+			# Do something
+		})
 	}, warning = function(w) {
 		write(paste("Warning somewhere in wikipathways2ndex.R:", w, sep = '\n'), stderr())
 		NA

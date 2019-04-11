@@ -77,7 +77,7 @@ Put job running and detach:
 
 ```
 screen -R
-rm -rf cx; ./bulk2ndex.sh --reuse
+rm -rf cx; ./export.R AnalysisCollection ndex
 # Ctrl+a
 # d
 ```
