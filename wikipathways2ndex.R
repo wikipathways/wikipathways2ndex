@@ -1,6 +1,10 @@
 library(dplyr)
 library(here)
+
+# ndexr relies on httr but doesn't handle importing it
+library(httr)
 library(ndexr)
+
 library(RCy3)
 library(rjson)
 library(rWikiPathways)
@@ -13,6 +17,7 @@ library(utf8)
 #installApp('WikiPathways')
 #system("bash ./install_dev_wikipathways_app.sh")
 
+source('./get_citation.R')
 source('./unify.R')
 
 NDEX_USER_UUID <- 'ae4b1027-1900-11e9-9fc6-0660b7976219'
@@ -70,6 +75,7 @@ is.blank <- function(x, false.triggers=FALSE){
 }
 
 canBeInteger <- function(x) {grepl('^\\d+$', x)}
+cannotBeInteger <- function(x) {!grepl('^\\d+$', x)}
 
 updateNetworkTable <- function(name, columnName, columnValue) {
 	updatedNetworkTableColumns <- data.frame(name = name, columnName = columnValue, stringsAsFactors=FALSE)
@@ -103,24 +109,29 @@ wikipathways2ndex <- function(wikipathwaysID) {
 			# do something
 			#write("Warning: pmids not found by cytoscape app in wikipathways2ndex.R", stderr())
 		} else {
-			#pmids <- as.integer(unlist(strsplit(raw_pmids, "\\s*,\\s*")))
 			pmids <- as.integer(Filter(canBeInteger, unlist(strsplit(raw_pmids, "\\s*,\\s*"))))
+			notpmids <- Filter(cannotBeInteger, unlist(strsplit(raw_pmids, "\\s*,\\s*")))
+			print('notpmids')
+			print(notpmids)
 		}
 
 		# FROM WEBSERVICE
 		pathwayInfo <- getPathwayInfo(wikipathwaysID)
 		#wikipathwaysID <- pathwayInfo[1]
 		#url <- pathwayInfo[2]
+
 		if (is.blank(title)) {
 			title <- pathwayInfo[3]
 			#write(paste("Warning: title not found by cytoscape app but was by getPathwayInfo in wikipathways2ndex.R:", title), stderr())
 			updateNetworkTable(nameInitial, "title", title)
 		}
+
 		if (is.blank(organism)) {
 			organism <- pathwayInfo[4]
 			#write(paste("Warning: organism not found by cytoscape app but was by getPathwayInfo in wikipathways2ndex.R:", organism), stderr())
 			updateNetworkTable(nameInitial, "organism", organism)
 		}
+
 		wikipathwaysVersion <- pathwayInfo[5]
 
 		if (is.blank(description)) {
@@ -178,12 +189,10 @@ wikipathways2ndex <- function(wikipathwaysID) {
 				 # Our license language here: https://www.wikipathways.org/index.php/WikiPathways:License_Terms#The_License.2FWaiver
 				 rights = 'Waiver-No Rights Reserved (CC0)',
 				 #rights = '<p xmlns:dct="http://purl.org/dc/terms/"> <a rel="license" href="http://creativecommons.org/publicdomain/zero/1.0/"> <img src="http://i.creativecommons.org/p/zero/1.0/88x31.png" style="border-style: none;" alt="CC0" /> </a> <br /> To the extent possible under law, <a rel="dct:publisher" href="https://www.wikipathways.org">https://www.wikipathways.org</a> has waived all copyright and related or neighboring rights to this work. </p>',
-				 networkType = 'pathway'
+				 networkType = 'pathway',
+			  	 # TODO: update to be able to handle non-human
+				 organism = paste('Human', '9606', organism, sep = '; ')
 				 )
-				 # these are inserted as network columns by the WikiPathways app:
-				 #title = title,
-				 #organism = organism,
-				 #description = description,
 
 		ontologyTerms <- getOntologyTerms(wikipathwaysID)
 		pathwayOntologyTerms <- unlist(lapply(ontologyTerms[unname(unlist(lapply(ontologyTerms, function(x) {x["ontology"] == 'Pathway Ontology'})))], function(x) {x[['name']]}))
@@ -191,8 +200,15 @@ wikipathways2ndex <- function(wikipathwaysID) {
 		if (!is.blank(pmids)) {
 			# NOTE: Rudi said use the latest if there are multiple
 			pubmedID <- max(pmids)
-			pubmedIRI <- paste0('https://identifiers.org/pubmed/', pubmedID)
-			metadata[["reference"]] <- makeHtmlLink(pubmedIRI, paste('PMID', pubmedID))
+
+			# TODO: decide with Rudi and Alex what to do here
+#			# format as HTML IRI link
+#			pubmedIRI <- paste0('https://identifiers.org/pubmed/', pubmedID)
+#			metadata[["reference"]] <- makeHtmlLink(pubmedIRI, paste('PMID', pubmedID))
+#
+#			# format as HTML citation
+#			citation <- get_citation(pubmedID)
+#			metadata[["reference"]] <- citation
 		}
 
 		if (length(pathwayOntologyTerms) > 0) {
@@ -227,32 +243,68 @@ wikipathways2ndex <- function(wikipathwaysID) {
 		filepathCx <- paste0(filepath_san_ext, '.cx')
 		filepathCys <- paste0(filepath_san_ext, '.cys')
 
-		tableColumnNamesPreCys <- getTableColumnNames()
+		closeSession(TRUE, filename=filepath_san_ext)
+		openSession(file.location=filepathCys)
 
+		#tableColumnNamesPreCys <- getTableColumnNames()
 		tableColumnsPreCys <- getTableColumns()
 
 		i <- sapply(tableColumnsPreCys, is.factor)
 		tableColumnsPreCys[i] <- lapply(tableColumnsPreCys[i], as.character)
+
+
+		emptyNodes <- as_tibble(tableColumnsPreCys) %>%
+			filter(is.na(GraphID) | is.null(GraphID) | GraphID == "")
+
+		print('emptyNodes')
+		print(emptyNodes)
+
+		print('emptyNodes$SUID')
+		print(emptyNodes$SUID)
+
 		CYTOSCAPE_NA<-""
-		tableColumnsCorrected <- as_tibble(tableColumnsPreCys) %>%
-			replace(.=="NULL", CYTOSCAPE_NA) %>%
-			replace(.=="null", CYTOSCAPE_NA) %>%
-			replace(.=="", CYTOSCAPE_NA) %>%
-			replace(.=="NA", CYTOSCAPE_NA) %>%
-			replace(.=="<NA>", CYTOSCAPE_NA) %>%
-			replace(.==NA, CYTOSCAPE_NA) %>%
-			replace(is.na(.), CYTOSCAPE_NA)
+		tableColumnsCorrected <- as.data.frame(
+						       as_tibble(tableColumnsPreCys) %>%
+							       replace(.=="NULL", CYTOSCAPE_NA) %>%
+							       replace(.=="null", CYTOSCAPE_NA) %>%
+							       replace(.=="", CYTOSCAPE_NA) %>%
+							       replace(.=="NA", CYTOSCAPE_NA) %>%
+							       replace(.=="<NA>", CYTOSCAPE_NA) %>%
+							       replace(.==NA, CYTOSCAPE_NA) %>%
+							       replace(is.null(.), CYTOSCAPE_NA) %>%
+							       replace(is.na(.), CYTOSCAPE_NA)
+						       )
 
 		loadTableData(as.data.frame(tableColumnsCorrected), table.key.column = 'SUID')
 
-		closeSession(TRUE, filename=filepath_san_ext)
-		openSession(file.location=filepathCys)
+		selectNodes(emptyNodes$SUID)
+		deleteSelectedNodes()
+
+		tableColumnsCorrectedLoaded <- getTableColumns()
+		print('tableColumnsCorrectedLoaded$GraphID')
+		print(tableColumnsCorrectedLoaded$GraphID)
+
+#		#edgeTableColumns <- getTableColumns(table = 'edge', columns = 'name,title,organism,description,pmids')
+#		edgeTableColumns <- getTableColumns(table = 'edge')
+#		print('edgeTableColumns')
+#		print(edgeTableColumns)
+#		deleteAllNetworks()
+#		createNetworkFromDataFrames(nodes = tableColumnsCorrected, edges = edgeTableColumns, title = name)
 
 		result[["name"]] <- name
+
 		#exportResponse <- exportNetworkToNDEx(NDEX_USER, NDEX_PWD, isPublic=TRUE)
 		# NOTE: we need to use this in order to submit to the test/dev2 server.
 		# exportNetworkToNDEx only submits to production server.
 		suid <- getNetworkSuid(NULL, "http://localhost:1234/v1")
+
+		#networkTableColumnNames <- getTableColumnNames(table = 'network')
+		#print(networkTableColumnNames)
+
+		# TODO: should we actually delete these?
+		deleteTableColumn('title', table = 'network')
+		deleteTableColumn('pmids', table = 'network')
+#		#deleteTableColumn('pmids', table = 'network', network = suid)
 
 		networks <- ndex_user_get_networksummary(ndexcon, userId=NDEX_USER_UUID)
 
@@ -262,40 +314,41 @@ wikipathways2ndex <- function(wikipathwaysID) {
 			filter(!isDeleted)
 
 		matchingNetworkCount <- nrow(matchingNetworks)
-		if (matchingNetworkCount > 0 && !is.blank(matchingNetworks)) {
-			print('Deleting...')
-			if (matchingNetworkCount > 1) {
-				write(paste0("Warning ", matchingNetworkCount, " matching networks (just 0 or 1 expected) in wikipathways2ndex.R:"), stderr())
-			}
-			networkId <- (matchingNetworks %>% head(1))[["externalId"]]
-			# if we get an error when trying to make editable, we ignore it and continue.
-			tryCatch({
-				ndex_network_set_systemProperties(ndexcon, networkId, readOnly=FALSE)
-			}, warning = function(w) {
-				write(paste("Warning making network editable in wikipathways2ndex.R:", w, sep = '\n'), stderr())
-				NA
-			}, error = function(err) {
-				write(paste("Error making network editable in wikipathways2ndex.R:", err, sep = '\n'), stderr())
-				NA
-			}, finally = {
-				# Do something
-			})
-
-			# if we get an error when trying to delete, we ignore it and continue.
-			tryCatch({
-				ndex_delete_network(ndexcon, networkId)
-			}, warning = function(w) {
-				write(paste("Warning when trying to update in wikipathways2ndex.R:", w, sep = '\n'), stderr())
-				NA
-			}, error = function(err) {
-				write(paste("Error when trying to update in wikipathways2ndex.R:", err, sep = '\n'), stderr())
-				NA
-			}, finally = {
-				# Do something
-			})
-		}
+#		if (matchingNetworkCount > 0 && !is.blank(matchingNetworks)) {
+#			print('Deleting...')
+#			if (matchingNetworkCount > 1) {
+#				write(paste0("Warning ", matchingNetworkCount, " matching networks (just 0 or 1 expected) in wikipathways2ndex.R:"), stderr())
+#			}
+#			networkId <- (matchingNetworks %>% head(1))[["externalId"]]
+#			# if we get an error when trying to make editable, we ignore it and continue.
+#			tryCatch({
+#				ndex_network_set_systemProperties(ndexcon, networkId, readOnly=FALSE)
+#			}, warning = function(w) {
+#				write(paste("Warning making network editable in wikipathways2ndex.R:", w, sep = '\n'), stderr())
+#				NA
+#			}, error = function(err) {
+#				write(paste("Error making network editable in wikipathways2ndex.R:", err, sep = '\n'), stderr())
+#				NA
+#			}, finally = {
+#				# Do something
+#			})
+#
+#			# if we get an error when trying to delete, we ignore it and continue.
+#			tryCatch({
+#				ndex_delete_network(ndexcon, networkId)
+#			}, warning = function(w) {
+#				write(paste("Warning when trying to update in wikipathways2ndex.R:", w, sep = '\n'), stderr())
+#				NA
+#			}, error = function(err) {
+#				write(paste("Error when trying to update in wikipathways2ndex.R:", err, sep = '\n'), stderr())
+#				NA
+#			}, finally = {
+#				# Do something
+#			})
+#		}
 
 		# TODO: this isn't working, so I made it impossible to enter for now
+		#if (matchingNetworkCount > 0 && !is.blank(matchingNetworks)) {}
 		if (TRUE==FALSE && matchingNetworkCount > 0 && !is.blank(matchingNetworks)) {
 			print('Updating...')
 			if (matchingNetworkCount > 1) {
@@ -308,10 +361,22 @@ wikipathways2ndex <- function(wikipathwaysID) {
 #			print('cx')
 #			print(cx)
 
-			rcx <- rcx_fromJSON(cx)
-			print('rcx')
-			print(rcx)
+			rcx_before <- ndex_get_network(ndexcon, networkId)
+			#print('rcx_before initial')
+			#print(str(rcx_before, max.level = 2))
+#			rcx_before <- rcx_asNewNetwork(rcx_before)
+#			print('rcx_before cleaned')
+#			print(rcx_before)
 
+#			rcx <- rcx_fromJSON(cx)
+#			print('rcx')
+#			print(rcx)
+#			print('typeof(rcx)')
+#			print(typeof(rcx))
+#			print('class(rcx)')
+#			print(class(rcx))
+
+			# URL: [ http://dev2.ndexbio.org/v2/network/b7ce4447-5b15-11e9-831d-0660b7976219/systemproperty ]
 			# if we get an error when trying to make editable, we ignore it and continue.
 			tryCatch({
 				ndex_network_set_systemProperties(ndexcon, networkId, readOnly=FALSE)
@@ -327,11 +392,25 @@ wikipathways2ndex <- function(wikipathwaysID) {
 
 			print('networkId before')
 			print(networkId)
-			print('typeof(rcx)')
-			print(typeof(rcx))
-			print('class(rcx)')
-			print(class(rcx))
-			networkId <- ndex_update_network(ndexcon, rcx, networkId)
+			#rcx_before <- rcx_asNewNetwork(rcx_before)
+			#print('rcx_before asNewNetwork')
+			#print(str(rcx_before, max.level = 2))
+			#print('rcx_before$metaData$properties')
+			#print(rcx_before$metaData$properties)
+
+			rcx_before$properties[rcx_before$properties == NULL] <- ""
+#			rcx_before$properties[rcx_before$properties == "NULL"] <- ""
+#			rcx_before$properties[rcx_before$properties == "null"] <- ""
+
+			#print('rcx_before de-nulled')
+			#print(str(rcx_before, max.level = 2))
+
+			#networkId <- ndex_update_network(ndexcon, rcx, networkId)
+			rcx_before <- rcx_updateMetaData(rcx_before)
+			print('rcx_before updated metadata')
+			print(str(rcx_before, max.level = 2))
+			#networkId <- ndex_update_network(ndexcon, rcx_before)
+			networkId <- ndex_update_network(ndexcon, rcx_before, networkId)
 
 #			# if we get an error when trying to update, we ignore it and continue.
 #			tryCatch({
@@ -373,6 +452,7 @@ wikipathways2ndex <- function(wikipathwaysID) {
 				# Do something
 			})
 		} else {
+			exportNetwork(filename=filepath_san_ext, type='CX')
 			print('Creating...')
 			res <- cyrestPOST(paste('networks', suid, sep = '/'),
 				      body = list(serverUrl="http://dev2.ndexbio.org/v2",

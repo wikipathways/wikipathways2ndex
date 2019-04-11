@@ -11,7 +11,9 @@
 DEV_VERSION_MAJOR="3"
 DEV_VERSION_MINOR="3"
 DEV_VERSION_PATCH="7"
-DEV_VERSION_SUB="6"
+DEV_VERSION_SUB="7"
+
+# https://github.com/wikipathways/cytoscape-wikipathways-app/blob/master/WikiPathways-3.3.77.jar?raw=true
 
 rm $HOME/CytoscapeConfiguration/3/apps/installed/WikiPathways-v*.jar
 rm -rf $HOME/CytoscapeConfiguration/app-data/org.wikipathways.cytoscapeapp*

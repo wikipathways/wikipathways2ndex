@@ -46,17 +46,43 @@ wikipathways2cx <- function(wikipathwaysID) {
 	networkName <- getNetworkName()
 	organism <- gsub(".*\\s\\-\\s", "", networkName)
 	filename <- paste0(wikipathwaysID, '__', gsub("_-_", "__", gsub(" ", "_", networkName)))
-	# TODO: when we export to CX via Cytoscape and try opening that same file with the same filepath,
-       	# fromJSON gives an error for non-ASCII filepaths, e.g., any incl/ characters like Greek alpha: α
-	# WP4566__Translational_regulation_by_PDGFRα__Homo_sapien
-	#filepath_san_ext <- file.path(CX_OUTPUT_DIR, filename)
+	# RCy3 turns a filepath like this:
+	#   ./WP4566__Translational_regulation_by_PDGFRα__Homo_sapies
+	# into this:
+	#   ./WP4566__Translational_regulation_by_PDGFR?__Homo_sapies
+	# See https://github.com/cytoscape/RCy3/issues/54
+	# Notice that the character
+	#   'α'
+        # takes up two bytes, but the character
+	#   'a'
+	# takes up just one byte.
+	# RCy3 changes
+	#   'α'
+	# to
+	#   '�'
+	# so we pre-emptively try to do the same thing here.
 
-	filepath_san_ext_raw <- file.path(CX_OUTPUT_DIR, filename)
-	Encoding(filepath_san_ext_raw) <- "UTF-8"
-	#filepath_san_ext <- iconv(filepath_san_ext_raw, 'UTF-8', 'ASCII', "byte")
-	#filepath_san_ext <- iconv(filepath_san_ext_raw, 'UTF-8', 'ASCII', sub = "?")
-	sub_char <- "?"
-	filepath_san_ext <- gsub(paste0('\\', sub_char, '\\', sub_char), sub_char, iconv(filepath_san_ext_raw, 'UTF-8', 'ASCII', sub = sub_char))
+	# Note that there may be cases where we get a different result from
+	# RCy3, e.g., what would happen if there were two single-byte non-ASCII
+	# characters next to each other?
+
+	# Also, note that this character:
+	#sub_char_final <- '�'
+	# is not the same as this character:
+	sub_char_final <- '?'
+
+	sub_char_initial <- 'wp_sub_char'
+	filepath_san_ext_utf8 <- file.path(CX_OUTPUT_DIR, filename)
+	Encoding(filepath_san_ext_utf8) <- "UTF-8"
+	filepath_san_ext <- gsub(
+				 paste0('\\', sub_char_initial),
+				 sub_char_final,
+				 gsub(
+				      paste0('\\', sub_char_initial, '\\', sub_char_initial),
+				      sub_char_initial,
+				      iconv(filepath_san_ext_utf8, 'UTF-8', 'ASCII', sub = sub_char_initial)
+				      )
+				 )
 
 	networkTableColumns <- getTableColumns(table = 'network')
 	print('networkTableColumns')
