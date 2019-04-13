@@ -1,10 +1,10 @@
 # from https://github.com/cytoscape/RCy3/blob/master/inst/unitTests/test_RCy3.R
+library(here)
 # RCytoscape/inst/test_cytoscape.R
 #-------------------------------------------------------------------------------
 library (RCy3)
 library (RUnit)
 library (graph)
-library(here)
 library (igraph)
 
 #-------------------------------------------------------------------------------
@@ -131,8 +131,6 @@ run.tests = function()
     test.createNetworkFromGraph()
     
     test.customGraphics()
-    # TODO: sometimes gettting an error when trying to run filter test
-    # see https://github.com/cytoscape/RCy3/issues/51
     test.filters()
     
     closeSession(FALSE)
@@ -1657,9 +1655,6 @@ test.customGraphics = function ()
     title = 'test.customGraphics'
     test.prep (title,FALSE)
     
-    # TODO: had to change this line to make it work. Is there a way to avoid changing it?
-    # see this issue: https://github.com/cytoscape/RCy3/issues/50#issuecomment-472082739
-    #openSession()
     openSession(file.location=here("test", "sampleData", "sessions", "Yeast Perturbation.cys"))
     checkEqualsNumeric(getNodeCount(),330)
     
@@ -1680,7 +1675,7 @@ test.customGraphics = function ()
     setNodeCustomBarChart(mycols, "STACKED", slot=7)
     setNodeCustomBarChart(mycols, "HEAT_STRIPS", slot=7)
     setNodeCustomBarChart(mycols, "UP_DOWN", slot=7)
-    setNodeCustomPosition("NW","SE", slot=7)
+        setNodeCustomPosition("NW","SE", slot=7)
     commandSleep(1)
     
     setNodeCustomBoxChart(mycols, slot=2)

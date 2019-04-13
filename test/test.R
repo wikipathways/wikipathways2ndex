@@ -3,7 +3,8 @@ library(RCy3)
 
 installApp("enhancedGraphics")
 
-source('./test/test_RCy3.R')
+#source('./test/test_RCy3.R')
+source('./test/test_deleteTableColumn.R')
 
 run.tests()
 

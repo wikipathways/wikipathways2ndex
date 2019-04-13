@@ -7,4 +7,9 @@
 # because it allows us to specify and load the exact version of every required dependency.
 
 library(RCy3)
+
+system("bash ./cytoscapestart.sh")
 cytoscapeVersionInfo ()
+print("RCy3 version:")
+packageVersion("RCy3")
+system("bash ./cytoscapestop.sh")

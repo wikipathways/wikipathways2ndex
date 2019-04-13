@@ -2,15 +2,15 @@
 
 stdenv.mkDerivation rec {
   name = "RCy3-${version}";
-  version = "2.3.10";
+  version = "2.3.12";
 
   cytoscape371 = callPackage ./cytoscape.nix {}; 
 
   src = fetchFromGitHub {
     owner = "cytoscape";
     repo = "RCy3";
-    rev = "e205b1ad94f592cf4d889f842ea1da24ed73807e";
-    sha256 = "0g5i7z9a3a81mv1bj9hshwwf3n4d6i32312v0jqv06rx7n9s405q";
+    rev = "0d8c8b0351ab399604ca28d01faf436a1e207e3e";
+    sha256 = "1npj2acqry733290d55jds5aryns84gsxkqnqah4a3iy1kx4b29c";
   };
 
   configurePhase = ''

@@ -1,7 +1,7 @@
 with import <nixpkgs> { config.allowUnfree = true; };
 let
   cytoscape371 = callPackage ./cytoscape.nix {}; 
-  RCy3_2310 = callPackage ./RCy3.nix {}; 
+  RCy3_2312 = callPackage ./RCy3.nix {}; 
 in [
     # Add packages from nix-env -qaP | grep -i needle queries
     #cytoscape
@@ -15,7 +15,7 @@ in [
 
     # R and R packages
     R
-    RCy3_2310
+    RCy3_2312
 ] ++ (with rPackages; [
   #RCy3
   here
