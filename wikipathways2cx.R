@@ -13,18 +13,8 @@ source('./unify.R')
 #system("bash ./install_dev_wikipathways_app.sh")
 #installApp('WikiPathways')
 
-# TODO: where should we output these files? We should allow for specifying the output location.
-CX_OUTPUT_DIR = here('cx')
-if (!dir.exists(CX_OUTPUT_DIR)) {
-	write(paste('Warning: Directory', CX_OUTPUT_DIR, 'does not exist. Creating now.'), stderr())
-	dir.create(CX_OUTPUT_DIR)
-} else {
-	# TODO: is there a better way to check for an empty directory?
-	# NOTE: length must be greater than 2, b/c the list always includes '.' and '..'
-	if(length(dir(CX_OUTPUT_DIR, all.files=TRUE)) > 2) {
-		stop(paste('Error for wikipathways2cx in wikipathways2cx.R: output dir', CX_OUTPUT_DIR, 'must be empty.'))
-	}
-}
+CX_OUTPUT_DIR = tempdir()
+write(paste('Created output directory for cx:', CX_OUTPUT_DIR), stderr())
 
 wikipathways2cx <- function(wikipathwaysID) {
 	net.suid <- commandsGET(paste0('wikipathways import-as-pathway id="', wikipathwaysID, '"'))

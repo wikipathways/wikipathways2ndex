@@ -1,4 +1,5 @@
 library(dplyr)
+library(purrr)
 library(here)
 
 # ndexr relies on httr but doesn't handle importing it
@@ -12,29 +13,42 @@ library(tidyr)
 library(XML)
 library(utf8)
 
-# Using dev version at present
-# https://github.com/wikipathways/cytoscape-wikipathways-app/blob/develop/WikiPathways-3.3.73.jar
+# Using dev version of WikiPathways app right now, so commenting this line out:
 #installApp('WikiPathways')
 #system("bash ./install_dev_wikipathways_app.sh")
 
 source('./get_citation.R')
 source('./unify.R')
 
+contextFile <- here("./context.json")
+CONTEXT <- readChar(contextFile, file.info(contextFile)$size)
+
+# TODO: should be able to get NDEX_USER_UUID from NDEX_USER or vice versa
+NDEX_USER_UUID <- Sys.getenv("NDEX_USER_UUID")
 NDEX_USER <- Sys.getenv("NDEX_USER")
 NDEX_PWD <- Sys.getenv("NDEX_PWD")
 
-# for test
-#NDEX_HOST="dev2.ndexbio.org"
-#NETWORKSET_ID <- '7dbe0e40-5c05-11e9-831d-0660b7976219'
-#NDEX_USER_UUID <- 'ae4b1027-1900-11e9-9fc6-0660b7976219'
+NDEX_HOST=""
+NETWORKSET_ID <- ''
+if (NDEX_USER == 'wikipathways') {
+	# for production
+	NDEX_HOST="ndexbio.org"
 
-# for production
-NDEX_HOST="ndexbio.org"
-NETWORKSET_ID <- '453c1c63-5c10-11e9-9f06-0ac135e8bacf'
-#NDEX_USER_UUID <- '3fa85f64-5717-4562-b3fc-2c963f66afa6'
-NDEX_USER_UUID <- '363f49e0-4cf0-11e9-9f06-0ac135e8bacf'
-print('NDEX_USER')
-print(NDEX_USER)
+	# for the set named 'wikipathways-gpml-Homo_sapiens'
+	NETWORKSET_ID <- '453c1c63-5c10-11e9-9f06-0ac135e8bacf'
+} else {
+	# for testing
+	NDEX_HOST="dev2.ndexbio.org"
+
+#	# for the set named 'testing'
+#	NETWORKSET_ID <- '7dbe0e40-5c05-11e9-831d-0660b7976219'
+#
+#	# for the set named 'wikipathways-gpml-Homo_sapiens'
+#	NETWORKSET_ID <- 'b44b7ca7-4da1-11e9-9fc6-0660b7976219'
+
+	# for the set named 'wikipathways-20190412-gpml-Homo_sapiens'
+	NETWORKSET_ID <- '6ecc6399-5d56-11e9-831d-0660b7976219'
+}
 
 NDEX_SERVER_URL=paste0("http://", NDEX_HOST, "/v2")
 
@@ -52,18 +66,8 @@ if (NDEX_USER == '' || NDEX_PWD == '') {
 	print(ndexcon)
 }
 
-# TODO: where should we output these files? We should allow for specifying the output location.
-CX_OUTPUT_DIR = here('cx')
-if (!dir.exists(CX_OUTPUT_DIR)) {
-	write(paste('Warning: Directory', CX_OUTPUT_DIR, 'does not exist. Creating now.'), stderr())
-	dir.create(CX_OUTPUT_DIR)
-} else {
-	# TODO: is there a better way to check for an empty directory?
-	# NOTE: length must be greater than 2, b/c the list always includes '.' and '..'
-	if(length(dir(CX_OUTPUT_DIR, all.files=TRUE)) > 2) {
-		stop(paste('Error for wikipathways2cx in wikipathways2cx.R: output dir', CX_OUTPUT_DIR, 'must be empty.'))
-	}
-}
+CX_OUTPUT_DIR = tempdir()
+write(paste('Created output directory for ndex:', CX_OUTPUT_DIR), stderr())
 
 # TODO: should we set the following?
 #options(encoding = "UTF-8")
@@ -93,10 +97,10 @@ is.blank <- function(x, false.triggers=FALSE){
 canBeInteger <- function(x) {grepl('^\\d+$', x)}
 cannotBeInteger <- function(x) {!grepl('^\\d+$', x)}
 
-updateNetworkTable <- function(name, columnName, columnValue) {
-	updatedNetworkTableColumns <- data.frame(name = name, columnName = columnValue, stringsAsFactors=FALSE)
+updateNetworkTable <- function(networkName, columnName, columnValue) {
+	updatedNetworkTableColumns <- data.frame(name = networkName, columnName = columnValue, stringsAsFactors=FALSE)
 	colnames(updatedNetworkTableColumns) <- c('name', columnName)
-	row.names(updatedNetworkTableColumns) <- c(name)
+	row.names(updatedNetworkTableColumns) <- c(networkName)
 	# TODO: use SUID here as matching key 
 	loadTableData(updatedNetworkTableColumns, table = 'network')
 }
@@ -110,8 +114,6 @@ wikipathways2ndex <- function(wikipathwaysID) {
 		# TODO: why does net.suid != suid, as gotten later on?
 		net.suid <- commandsGET(paste0('wikipathways import-as-pathway id="', wikipathwaysID, '"'))
 
-		networks <- ndex_user_get_networksummary(ndexcon, userId=NDEX_USER_UUID)
-
 		# FROM WIKIPATHWAYS APP
 		networkTableColumns <- getTableColumns(table = 'network', columns = 'name,title,organism,description,pmids')
 
@@ -119,22 +121,44 @@ wikipathways2ndex <- function(wikipathwaysID) {
 		title <- networkTableColumns[["title"]]
 		organism <- networkTableColumns[["organism"]]
 		description <- networkTableColumns[["description"]]
-		pmids <- NA
 		raw_pmids <- networkTableColumns[["pmids"]]
-		if (is.blank(raw_pmids)) {
-			# do something
-			#write("Warning: pmids not found by cytoscape app in wikipathways2ndex.R", stderr())
-		} else {
+		if (!is.blank(raw_pmids)) {
+			pathway_raw_pmids = paste(wikipathwaysID, raw_pmids, sep = ': ')
+			cat(pathway_raw_pmids, file=here("raw_pmids.txt"), append=TRUE, sep = "\n")
 			pmids <- as.integer(Filter(canBeInteger, unlist(strsplit(raw_pmids, "\\s*,\\s*"))))
+			if (!is.blank(pmids)) {
+				pmIRIs <- paste(map(pmids, function(pmid) {
+					return(paste0('pubmed:', pmid))
+				}), collapse = '; ')
+
+				updateNetworkTable(nameInitial, "pmids", pmIRIs)
+
+				# TODO: decide with Rudi and Alex what to do here
+#				# NOTE: Rudi said use the latest if there are multiple
+#				pubmedID <- max(pmids)
+#
+#				# format as HTML IRI link
+#				pubmedIRI <- paste0('https://identifiers.org/pubmed/', pubmedID)
+#				metadata[["reference"]] <- makeHtmlLink(pubmedIRI, paste('PMID', pubmedID))
+#
+#				# format as HTML citation
+#				citation <- get_citation(pubmedID)
+#				metadata[["reference"]] <- citation
+			}
 			notpmids <- Filter(cannotBeInteger, unlist(strsplit(raw_pmids, "\\s*,\\s*")))
-			print('notpmids')
-			print(notpmids)
+			if (length(notpmids) > 0) {
+				pathway_text = paste(wikipathwaysID, paste(notpmids, collapse = ', '), sep = ': ')
+				cat(pathway_text, file=here("notpmids.txt"), append=TRUE, sep = "\n")
+			}
 		}
+
 
 		# FROM WEBSERVICE
 		pathwayInfo <- getPathwayInfo(wikipathwaysID)
 		#wikipathwaysID <- pathwayInfo[1]
 		#url <- pathwayInfo[2]
+
+		updateNetworkTable(nameInitial, "@context", list("@context"=CONTEXT))
 
 		if (is.blank(title)) {
 			title <- pathwayInfo[3]
@@ -205,27 +229,14 @@ wikipathways2ndex <- function(wikipathwaysID) {
 				 # Our license language here: https://www.wikipathways.org/index.php/WikiPathways:License_Terms#The_License.2FWaiver
 				 rights = 'Waiver-No Rights Reserved (CC0)',
 				 #rights = '<p xmlns:dct="http://purl.org/dc/terms/"> <a rel="license" href="http://creativecommons.org/publicdomain/zero/1.0/"> <img src="http://i.creativecommons.org/p/zero/1.0/88x31.png" style="border-style: none;" alt="CC0" /> </a> <br /> To the extent possible under law, <a rel="dct:publisher" href="https://www.wikipathways.org">https://www.wikipathways.org</a> has waived all copyright and related or neighboring rights to this work. </p>',
-				 networkType = 'pathway',
-			  	 # TODO: update to be able to handle non-human
-				 organism = paste('Human', '9606', organism, sep = '; ')
+				 networkType = 'pathway'
+				 # Disabled the following, because it's being handled by @context
+#			  	 # TODO: update to be able to handle non-human
+#				 organism = paste('Human', '9606', organism, sep = '; ')
 				 )
 
 		ontologyTerms <- getOntologyTerms(wikipathwaysID)
 		pathwayOntologyTerms <- unlist(lapply(ontologyTerms[unname(unlist(lapply(ontologyTerms, function(x) {x["ontology"] == 'Pathway Ontology'})))], function(x) {x[['name']]}))
-
-		if (!is.blank(pmids)) {
-			# NOTE: Rudi said use the latest if there are multiple
-			pubmedID <- max(pmids)
-
-			# TODO: decide with Rudi and Alex what to do here
-#			# format as HTML IRI link
-#			pubmedIRI <- paste0('https://identifiers.org/pubmed/', pubmedID)
-#			metadata[["reference"]] <- makeHtmlLink(pubmedIRI, paste('PMID', pubmedID))
-#
-#			# format as HTML citation
-#			citation <- get_citation(pubmedID)
-#			metadata[["reference"]] <- citation
-		}
 
 		if (length(pathwayOntologyTerms) > 0) {
 			metadata[["labels"]] <- paste(append(c(wikipathwaysID), pathwayOntologyTerms), collapse = '; ')
@@ -262,15 +273,11 @@ wikipathways2ndex <- function(wikipathwaysID) {
 		closeSession(TRUE, filename=filepath_san_ext)
 		openSession(file.location=filepathCys)
 
-		#tableColumnNamesPreCys <- getTableColumnNames()
 		tableColumnsPreCys <- getTableColumns()
 
 		i <- sapply(tableColumnsPreCys, is.factor)
 		tableColumnsPreCys[i] <- lapply(tableColumnsPreCys[i], as.character)
 
-
-		emptyNodes <- as_tibble(tableColumnsPreCys) %>%
-			filter(is.na(GraphID) | is.null(GraphID) | GraphID == "")
 
 		CYTOSCAPE_NA<-""
 		tableColumnsCorrected <- as.data.frame(
@@ -284,37 +291,76 @@ wikipathways2ndex <- function(wikipathwaysID) {
 							       replace(is.null(.), CYTOSCAPE_NA) %>%
 							       replace(is.na(.), CYTOSCAPE_NA)
 						       )
-
 		loadTableData(as.data.frame(tableColumnsCorrected), table.key.column = 'SUID')
 
-		selectNodes(emptyNodes$SUID)
-		deleteSelectedNodes()
+#		# Some or all of these are actually Groups
+#		emptyNodes <- as_tibble(tableColumnsPreCys) %>%
+#			filter(is.na(GraphID) | is.null(GraphID) | GraphID == "")
+#
+#		selectNodes(emptyNodes$SUID)
+#		deleteSelectedNodes()
 
 		tableColumnsCorrectedLoaded <- getTableColumns()
 
 		result[["name"]] <- name
 
+		renameTableColumn('pmids', 'gpml:hasPublicationXref', table = 'network')
+		renameTableColumn('title', 'gpml:name', table = 'network')
+
 		suid <- getNetworkSuid(NULL, "http://localhost:1234/v1")
 
-		# TODO: should we actually delete these?
-		deleteTableColumn('title', table = 'network')
-		deleteTableColumn('pmids', table = 'network')
+		networks_r <- GET(
+			 paste(NDEX_SERVER_URL, 'networkset', NETWORKSET_ID, sep = '/'),
+			 accept_json(),
+			 authenticate(NDEX_USER, NDEX_PWD)
+			 )
+		stop_for_status(networks_r)
+		setNetworks <- content(networks_r)$networks
 
-		networks <- ndex_user_get_networksummary(ndexcon, userId=NDEX_USER_UUID)
+		matchingNetworkIds <- (as_tibble(list(setNetworkId=setNetworks)) %>%
+			mutate(data=map(setNetworkId, function(setNetworkId) {
+				returned <- tryCatch({
+					res <- ndex_network_get_summary(ndexcon, setNetworkId)
+					externalId <- res$externalId
+					isDeleted <- res$isDeleted
+					properties <- res$properties
+					wikipathwaysIDRow <- properties[properties$predicateString == "wikipathwaysID" , ]
+					wikipathwaysID <- wikipathwaysIDRow$value
+					list(externalId=externalId, wikipathwaysID=wikipathwaysID, isDeleted=isDeleted)
+				}, warning = function(w) {
+					write(paste("Warning getting network summary in wikipathways2ndex.R:", w, sep = '\n'), stderr())
+					list(externalId=NA, wikipathwaysID=NA, isDeleted=NA)
+					#NA
+				}, error = function(err) {
+					write(paste("Error getting network summary in wikipathways2ndex.R:", err, sep = '\n'), stderr())
+					list(externalId=NA, wikipathwaysID=NA, isDeleted=NA)
+					#NA
+				}, finally = {
+					# Do something
+				})
 
-		matchingNetworks <- as_tibble(networks) %>%
-			filter(grepl(paste0('wikipathways\\/', wikipathwaysID), wikipathwaysID) | grepl(paste0(wikipathwaysID, '\\s'), name)) %>%
-			filter(version == ndexVersion) %>%
-			filter(!isDeleted)
+				return(returned)
+			})) %>%
+			mutate(externalId=map_chr(data, "externalId")) %>%
+			mutate(wikipathwaysID=map_chr(data, "wikipathwaysID")) %>%
+			mutate(isDeleted=map_lgl(data, "isDeleted")) %>%
+			filter(!is.na(wikipathwaysID)& wikipathwaysID == !!wikipathwaysID & !isDeleted))$externalId
 
-		matchingNetworkCount <- nrow(matchingNetworks)
+		matchingNetworkCount <- length(matchingNetworkIds)
 
-		if (matchingNetworkCount > 0 && !is.blank(matchingNetworks)) {
+		deleteTableColumn('row.names', table = 'network')
+
+		if (matchingNetworkCount > 0 && !is.blank(matchingNetworkIds)) {
 			print('Updating...')
 			if (matchingNetworkCount > 1) {
-				write(paste0("Warning ", matchingNetworkCount, " matching networks (just 0 or 1 expected) in wikipathways2ndex.R. Using first. :"), stderr())
+				write(paste0("Warning ", matchingNetworkCount, " matching networks (just 0 or 1 expected) in wikipathways2ndex.R. Using first and deleting the rest."), stderr())
+				remainingNetworkIds <- tail(matchingNetworkIds, -1)
+				for (remainingNetworkId in remainingNetworkIds) {
+					ndex_network_set_systemProperties(ndexcon, remainingNetworkId, readOnly=FALSE)
+					ndex_delete_network(ndexcon, remainingNetworkId)
+				}
 			}
-			networkId <- (matchingNetworks %>% head(1))[["externalId"]]
+			networkId <- head(matchingNetworkIds, 1)
 
 			# if we get an error when trying to make editable, we ignore it and continue.
 			tryCatch({
@@ -347,7 +393,8 @@ wikipathways2ndex <- function(wikipathwaysID) {
 				# Do something
 			})
 
-			# TODO:: the code below is copied from the "else" further below in this file
+			# TODO:: the code below is the same as what's in the "else"
+			# section further down in this file
 			print('Re-creating...')
 			res <- cyrestPOST(paste('networks', suid, sep = '/'),
 				      body = list(serverUrl=NDEX_SERVER_URL,
@@ -355,10 +402,8 @@ wikipathways2ndex <- function(wikipathwaysID) {
 						  password=NDEX_PWD,
 						  metadata=metadata,
 						  isPublic=TRUE),
-				      base.url = "http://localhost:1234/cyndex2/v1")
-
-			networkId <- res$data$uuid
-			result[["response"]] <- networkId
+					  base.url = "http://localhost:1234/cyndex2/v1")
+			result[["response"]] <- res$data$uuid
 			resErrors <- res$errors
 			if (length(resErrors) > 0) {
 				message <- paste(resErrors, sep = ' ')
@@ -442,7 +487,6 @@ wikipathways2ndex <- function(wikipathwaysID) {
 #			result[["success"]] <- TRUE
 #			result[["response"]] <- networkId
 		} else {
-			#exportResponse <- exportNetworkToNDEx(NDEX_USER, NDEX_PWD, isPublic=TRUE)
 			# NOTE: we need to use cyrestPOST in order to submit to the test/dev2 server.
 			# exportNetworkToNDEx only submits to production server.
 			exportNetwork(filename=filepath_san_ext, type='CX')
@@ -454,9 +498,7 @@ wikipathways2ndex <- function(wikipathwaysID) {
 						  metadata=metadata,
 						  isPublic=TRUE),
 					  base.url = "http://localhost:1234/cyndex2/v1")
-
-			networkId <- res$data$uuid
-			result[["response"]] <- networkId
+			result[["response"]] <- res$data$uuid
 			resErrors <- res$errors
 			if (length(resErrors) > 0) {
 				message <- paste(resErrors, sep = ' ')
@@ -468,12 +510,15 @@ wikipathways2ndex <- function(wikipathwaysID) {
 			}
 		}
 
+		networkId <- result[["response"]]
+
 		r <- POST(
 			  paste(NDEX_SERVER_URL, 'networkset', NETWORKSET_ID, 'members', sep = '/'),
 			  body = list(networkId),
 			  encode = "json",
 			  authenticate(NDEX_USER, NDEX_PWD)
 			  )
+		stop_for_status(r)
 
 		# if we get an error when trying to make readOnly, we ignore it and continue.
 		tryCatch({
@@ -485,6 +530,7 @@ wikipathways2ndex <- function(wikipathwaysID) {
 				 encode = "json",
 				 authenticate(NDEX_USER, NDEX_PWD)
 				 )
+			stop_for_status(r)
 		}, warning = function(w) {
 			write(paste("Warning making network readOnly in wikipathways2ndex.R:", w, sep = '\n'), stderr())
 			NA
