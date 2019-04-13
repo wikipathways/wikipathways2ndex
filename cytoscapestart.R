@@ -1,4 +1,5 @@
 library(RCy3)
+library(here)
 
-source('./connect.R')
+source(here('connect.R'))
 connect()
