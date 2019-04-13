@@ -35,7 +35,7 @@ export NDEX_PWD="password-for-your-ndex-account"
 If you don't have permissions to edit the NDEx Network Sets specified in `wikipathways2ndex.R`,
 you'll need to change to one you can edit.
 
-3. Execute: `./export.R AnalysisCollection ndex`
+3. Execute: `./export.R AnalysisCollection ndex ./output-dir`
 
 To see more options, run `./export.R --help`
 
@@ -43,7 +43,7 @@ To put job running and detach:
 
 ```
 screen -R
-./export.R AnalysisCollection ndex
+./export.R AnalysisCollection ndex ./output-dir
 # Ctrl+a
 # d
 ```

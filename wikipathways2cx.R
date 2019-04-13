@@ -13,10 +13,7 @@ source('./unify.R')
 #system("bash ./install_dev_wikipathways_app.sh")
 #installApp('WikiPathways')
 
-CX_OUTPUT_DIR = tempdir()
-write(paste('Created output directory for cx:', CX_OUTPUT_DIR), stderr())
-
-wikipathways2cx <- function(wikipathwaysID) {
+wikipathways2cx <- function(CX_OUTPUT_DIR, wikipathwaysID) {
 	net.suid <- commandsGET(paste0('wikipathways import-as-pathway id="', wikipathwaysID, '"'))
 
 	pathwayInfo <- getPathwayInfo(wikipathwaysID)
@@ -75,11 +72,7 @@ wikipathways2cx <- function(wikipathwaysID) {
 				 )
 
 	networkTableColumns <- getTableColumns(table = 'network')
-	print('networkTableColumns')
-	print(networkTableColumns)
 	networkTableColumnsUpdated <- data.frame("version" = c(pathwayInfo[5]), "organism")
-	print('networkTableColumnsUpdated')
-	print(networkTableColumnsUpdated)
 	loadTableData(networkTableColumnsUpdated, table = 'network')
 
 	# save as png
@@ -95,6 +88,10 @@ wikipathways2cx <- function(wikipathwaysID) {
 
 	# save as cx
 	exportResponse <- exportNetwork(filename=filepath_san_ext, type='CX')
+	print(paste0("ls ", CX_OUTPUT_DIR))
+	system(paste0("ls ", CX_OUTPUT_DIR))
+	system("pwd")
+	system(paste0("cp -r ", CX_OUTPUT_DIR, " ./cxo"))
 	# TODO: right now, exportResponse only has one named item: 'file'.
 	# But it should also include the status info from the cx. 
 	# Then w could possibly just use exportResponse instead of making the

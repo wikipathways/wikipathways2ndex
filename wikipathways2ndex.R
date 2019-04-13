@@ -66,9 +66,6 @@ if (NDEX_USER == '' || NDEX_PWD == '') {
 	print(ndexcon)
 }
 
-CX_OUTPUT_DIR = tempdir()
-write(paste('Created output directory for ndex:', CX_OUTPUT_DIR), stderr())
-
 # TODO: should we set the following?
 #options(encoding = "UTF-8")
 
@@ -105,7 +102,7 @@ updateNetworkTable <- function(networkName, columnName, columnValue) {
 	loadTableData(updatedNetworkTableColumns, table = 'network')
 }
 
-wikipathways2ndex <- function(wikipathwaysID) {
+wikipathways2ndex <- function(CX_OUTPUT_DIR, wikipathwaysID) {
 	result <- list()
 	tryCatch({
 		ndexVersion = format(Sys.time(), "%Y%m%d")

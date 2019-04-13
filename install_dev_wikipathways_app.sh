@@ -7,7 +7,6 @@
 # because it allows us to specify and load the exact version of every required dependency.
 
 # https://github.com/wikipathways/cytoscape-wikipathways-app/blob/master/WikiPathways-3.3.76.jar?raw=true
-
 DEV_VERSION_MAJOR="3"
 DEV_VERSION_MINOR="3"
 DEV_VERSION_PATCH="7"

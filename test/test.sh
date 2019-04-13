@@ -8,23 +8,16 @@
 
 reuse=$1
 
-# from https://unix.stackexchange.com/a/84980
-TMPDIR=`mktemp -d 2>/dev/null || mktemp -d -t 'wikipathways2ndextmpdir'`
+# see https://stackoverflow.com/a/246128/5354298
+get_script_dir() { echo "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"; }
+SCRIPT_DIR=$(get_script_dir)
 
-bash ./cytoscapestart.sh
+(cd "$SCRIPT_DIR/../rcy3_nix"; bash cytoscapestart.sh)
 
-if [ -d ./cx ]; then
-	mv ./cx $TMPDIR
-fi
-Rscript ./test/test.R
-rm WP554__ACE_Inhibitor_Pathway__Homo_sapiens.png
-rm -rf ./cx
-if [ -d $TMPDIR ]; then
-	mv $TMPDIR ./cx
-fi
+Rscript "$SCRIPT_DIR/test.R"
 
 if [[ ! -z $reuse ]]; then
 	echo 'Cytoscape left open for further use...' > /dev/stderr
 else
-	bash ./cytoscapestop.sh
+	(cd "$SCRIPT_DIR/../rcy3_nix"; bash cytoscapestop.sh)
 fi

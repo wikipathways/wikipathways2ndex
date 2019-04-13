@@ -6,12 +6,16 @@
 # #! /usr/bin/env bash
 # because it allows us to specify and load the exact version of every required dependency.
 
+# see https://stackoverflow.com/a/246128/5354298
+get_script_dir() { echo "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"; }
+SCRIPT_DIR=$(get_script_dir)
+
 cytoscape_command_name='.xvfb-run-wrapped cytoscape'
 tmux_session_name='wikipathways2ndex'
 
 if [[ $(ps -o pid= -C "$cytoscape_command_name" | wc -l) -gt 0 ]] && [[ $(tmux ls | grep $tmux_session_name) ]]; then
 	echo 'Cytoscape is running. Shutting down...' > /dev/stderr
-	Rscript cytoscapestop.R
+	Rscript "$SCRIPT_DIR/cytoscapestop.R"
 	#tmux send-keys 'shutdown --force' C-m
 	# kludge to wait for cytoscape to shutdown
 	echo 'waiting for cytoscape to stop...'
