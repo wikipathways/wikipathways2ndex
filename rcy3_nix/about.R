@@ -8,8 +8,32 @@
 
 library(RCy3)
 
-system("bash ./cytoscapestart.sh")
+# from https://stackoverflow.com/a/15373917
+thisFile <- function() {
+        cmdArgs <- commandArgs(trailingOnly = FALSE)
+        needle <- "--file="
+        match <- grep(needle, cmdArgs)
+        if (length(match) > 0) {
+                # Rscript
+                return(normalizePath(sub(needle, "", cmdArgs[match])))
+        } else {
+                # 'source'd via R console
+                return(normalizePath(sys.frames()[[1]]$ofile))
+        }
+}
+SCRIPT_DIR <- dirname(thisFile())
+
+# Launch
+system(paste0("bash ", file.path(SCRIPT_DIR, "cytoscapestart.sh")))
+
+print("Cytoscape version:")
 cytoscapeVersionInfo ()
+
 print("RCy3 version:")
 packageVersion("RCy3")
-system("bash ./cytoscapestop.sh")
+
+print("Installed Apps:")
+getInstalledApps()
+
+# Shutdown
+system(paste0("bash ", file.path(SCRIPT_DIR, "cytoscapestop.sh")))

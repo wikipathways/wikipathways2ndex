@@ -15,7 +15,7 @@ tmux_session_name='wikipathways2ndex'
 
 if [[ $(ps -o pid= -C "$cytoscape_command_name" | wc -l) -gt 0 ]] && [[ $(tmux ls | grep $tmux_session_name) ]]; then
 	echo 'Cytoscape is running. Shutting down...' > /dev/stderr
-	Rscript "$SCRIPT_DIR/cytoscapestop.R"
+	(cd "$SCRIPT_DIR"; Rscript "./cytoscapestop.R")
 	#tmux send-keys 'shutdown --force' C-m
 	# kludge to wait for cytoscape to shutdown
 	echo 'waiting for cytoscape to stop...'

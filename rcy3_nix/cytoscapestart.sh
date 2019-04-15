@@ -27,5 +27,5 @@ else
 	# Send command to the tmux session to launch cytoscape w/ the Xvfb fake display
 	tmux send-keys 'xvfb-run cytoscape --rest 1234' C-m
 
-	Rscript "$SCRIPT_DIR/cytoscapestart.R"
+	(cd "$SCRIPT_DIR"; Rscript "./cytoscapestart.R")
 fi
