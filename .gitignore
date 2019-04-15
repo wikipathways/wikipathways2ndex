@@ -1,5 +1,5 @@
 .RData
 .Rhistory
-WikiPathways-v3.3.7-3.jar
+WikiPathways-v3.3.7-*.jar
 show_fails
-cx/*
+pathway_ids.tsv
