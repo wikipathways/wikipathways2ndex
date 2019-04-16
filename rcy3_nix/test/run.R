@@ -1,5 +1,5 @@
 #! /usr/bin/env nix-shell
-#! nix-shell ./nix_shell_shebang_dependencies.nix -i Rscript
+#! nix-shell ../nix_shell_shebang_dependencies.nix -i Rscript
 
 # NOTE: what you see above is a [Nix shebang](https://nixos.org/nix/manual/#ssec-nix-shell-shebang).
 # We used it instead of this shebang:
@@ -24,16 +24,15 @@ thisFile <- function() {
 SCRIPT_DIR <- dirname(thisFile())
 
 # Launch
-system(paste0("bash ", file.path(SCRIPT_DIR, "cytoscapestart.sh")))
+system(paste0("bash ", file.path(SCRIPT_DIR, "..", "extras", "cytoscapestart.sh")))
 
-print("Cytoscape version:")
-cytoscapeVersionInfo ()
+installApp("enhancedGraphics")
 
-print("RCy3 version:")
-packageVersion("RCy3")
+source(file.path(SCRIPT_DIR, 'test_RCy3.R'))
+run.tests()
 
-print("Installed Apps:")
-getInstalledApps()
+source(file.path(SCRIPT_DIR, 'test_deleteTableColumn.R'))
+run.tests()
 
 # Shutdown
-system(paste0("bash ", file.path(SCRIPT_DIR, "cytoscapestop.sh")))
+system(paste0("bash ", file.path(SCRIPT_DIR, "..", "extras", "cytoscapestop.sh")))

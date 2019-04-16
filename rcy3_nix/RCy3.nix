@@ -1,4 +1,4 @@
-{ stdenv, callPackage, fetchFromGitHub, R, rPackages }:
+{ stdenv, callPackage, fetchFromGitHub, R, rPackages, which, coreutils }:
 
 stdenv.mkDerivation rec {
   name = "RCy3-${version}";
@@ -19,8 +19,13 @@ stdenv.mkDerivation rec {
     runHook postConfigure
   '';
 
-  buildInputs = [R cytoscape371];
-  propagatedBuildInputs = with rPackages; [ BiocGenerics graph httr igraph RJSONIO XML R_utils];
+  buildInputs = [ R cytoscape371 which coreutils ];
+  propagatedBuildInputs = with rPackages; [ BiocGenerics graph httr igraph RJSONIO XML R_utils ];
+
+  patchPhase = ''
+    substituteInPlace ./R/Session.R \
+      --replace ./sampleData/ $(dirname $(dirname $(which cytoscape)))/share/sampleData/
+  '';
 
   buildPhase = ''
     runHook preBuild
@@ -34,6 +39,12 @@ stdenv.mkDerivation rec {
     mkdir -p $out/library
     $rCommand CMD INSTALL $installFlags --configure-args="$configureFlags" -l $out/library .
     runHook postInstall
+  '';
+
+  doInstallCheck = stdenv.hostPlatform == stdenv.buildPlatform;
+  installCheckPhase = ''
+    RCy3VersionOutput=$(R -q --slave -e 'library(RCy3); packageVersion("RCy3");')
+    [[ $RCy3VersionOutput =~ (^|[^0-9a-zA-Z\.\-])${version}([^0-9a-zA-Z\.\-]|$) ]]
   '';
 
   postFixup = ''

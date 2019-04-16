@@ -1,16 +1,10 @@
-mv test_RCy3.R test_RCy3.R-old
+# see https://stackoverflow.com/a/246128/5354298
+get_script_dir() { echo "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"; }
+SCRIPT_DIR=$(get_script_dir)
 
-touch test_RCy3.R
+# Get from github
+#wget https://raw.githubusercontent.com/cytoscape/RCy3/master/inst/unitTests/test_RCy3.R -O "$SCRIPT_DIR/test_RCy3.R"
 
-echo '# from https://github.com/cytoscape/RCy3/blob/master/inst/unitTests/test_RCy3.R' >> test_RCy3.R
-echo 'library(here)' >> test_RCy3.R
-
-wget https://raw.githubusercontent.com/cytoscape/RCy3/master/inst/unitTests/test_RCy3.R -O ./raw_test_RCy3.R
-cat raw_test_RCy3.R >> test_RCy3.R
-rm raw_test_RCy3.R
-
-# TODO: Currently have to change any calls to "openSession()" to make that call
-# work. Is there a way to avoid changing it?
-# see this issue: https://github.com/cytoscape/RCy3/issues/50#issuecomment-472082739
-
-sed -i 's#openSession()#openSession(file.location=here("test", "sampleData", "sessions", "Yeast Perturbation.cys"))#g' test_RCy3.R
+# Get locally
+RCy3Path=$(nix-env -f "$SCRIPT_DIR/default.nix" -qa --no-name --out-path)
+cp "$RCy3Path/library/RCy3/unitTests/test_RCy3.R" "$SCRIPT_DIR/test_RCy3.R"

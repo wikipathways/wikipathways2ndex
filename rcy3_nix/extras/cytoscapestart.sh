@@ -1,5 +1,5 @@
 #! /usr/bin/env nix-shell
-#! nix-shell nix_shell_shebang_dependencies.nix -i bash
+#! nix-shell ../nix_shell_shebang_dependencies.nix -i bash
 
 # NOTE: what you see above is a [Nix shebang](https://nixos.org/nix/manual/#ssec-nix-shell-shebang).
 # We used it instead of this shebang:
@@ -13,13 +13,17 @@ SCRIPT_DIR=$(get_script_dir)
 cytoscape_command_name='.xvfb-run-wrapped cytoscape'
 tmux_session_name='wikipathways2ndex'
 if [[ $(ps -o pid= -C "$cytoscape_command_name" | wc -l) -gt 0 ]] && [[ $(tmux ls | grep $tmux_session_name) ]]; then
-	echo 'Using existing Cytoscape instance...' > /dev/stderr
+	#echo 'Using existing Cytoscape instance...' > /dev/stderr
+	echo 'Using existing Cytoscape instance...'
 elif [[ $(ps -o pid= -C "$cytoscape_command_name" | wc -l) -gt 0 ]]; then
-	echo "Cytoscape running but not tmux $tmux_session_name?" > /dev/stderr
+	#echo "Cytoscape running but not tmux $tmux_session_name?" > /dev/stderr
+	echo "Cytoscape running but not tmux $tmux_session_name?"
 elif [[ $(tmux ls | grep $tmux_session_name) ]]; then
-	echo "tmux $tmux_session_name running but not Cytoscape?" > /dev/stderr
+	#echo "tmux $tmux_session_name running but not Cytoscape?" > /dev/stderr
+	echo "tmux $tmux_session_name running but not Cytoscape?"
 else
-	echo 'Starting Cytoscape...' > /dev/stderr
+	#echo 'Starting Cytoscape...' > /dev/stderr
+	echo 'Starting Cytoscape...'
 	# Equivalent to Ctrl-b c to create a new window,
 	# followed by Ctrl-b d to detach
 	tmux new-session -d -s $tmux_session_name

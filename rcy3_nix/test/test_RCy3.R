@@ -1,5 +1,3 @@
-# from https://github.com/cytoscape/RCy3/blob/master/inst/unitTests/test_RCy3.R
-library(here)
 # RCytoscape/inst/test_cytoscape.R
 #-------------------------------------------------------------------------------
 library (RCy3)
@@ -1655,7 +1653,7 @@ test.customGraphics = function ()
     title = 'test.customGraphics'
     test.prep (title,FALSE)
     
-    openSession(file.location=here("test", "sampleData", "sessions", "Yeast Perturbation.cys"))
+    openSession()
     checkEqualsNumeric(getNodeCount(),330)
     
     # set canvas
