@@ -57,6 +57,10 @@ screen -R
 # K
 ```
 
+## Development
+
+Run tests: `./test/test.sh`
+
 ## Further Details
 
 We used [`xvfb-run`](http://elementalselenium.com/tips/38-headless) as a dummy display to enable running Cytoscape in headless mode. Should we use something other than `xvfb-run`?
