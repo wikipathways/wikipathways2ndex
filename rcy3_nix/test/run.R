@@ -23,16 +23,23 @@ thisFile <- function() {
 }
 SCRIPT_DIR <- dirname(thisFile())
 
-# Launch
-system(paste0("bash ", file.path(SCRIPT_DIR, "..", "extras", "cytoscapestart.sh")))
+tryCatch({
+	# Launch
+	system(paste0("bash ", file.path(SCRIPT_DIR, "..", "extras", "cytoscapestart.sh")))
 
-installApp("enhancedGraphics")
+	source(file.path(SCRIPT_DIR, 'test_RCy3.R'))
+	run.tests()
+	#test.filters()
 
-source(file.path(SCRIPT_DIR, 'test_RCy3.R'))
-run.tests()
-
-source(file.path(SCRIPT_DIR, 'test_deleteTableColumn.R'))
-run.tests()
-
-# Shutdown
-system(paste0("bash ", file.path(SCRIPT_DIR, "..", "extras", "cytoscapestop.sh")))
+	source(file.path(SCRIPT_DIR, 'test_deleteTableColumn.R'))
+	run.tests()
+}, warning = function(w) {
+	write(paste('Warning in run.R:', w, sep = '\n'), stderr())
+}, error = function(e) {
+	write(paste('Error in run.R:', e, sep = '\n'), stderr())
+}, interrupt = function(i) {
+	write(paste('Interrupted run.R:', i, sep = '\n'), stderr())
+}, finally = {
+	# Shutdown
+	system(paste0("bash ", file.path(SCRIPT_DIR, "..", "extras", "cytoscapestop.sh")))
+})

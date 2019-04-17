@@ -17,7 +17,7 @@ run.tests = function()
     # start with a clean slate, and no windows
     deleteAllNetworks()     
     
-    test.deleteNetworkTableColumn()
+    test.deleteTableColumn()
     
     closeSession(FALSE)
     options('warn'=0)
@@ -60,17 +60,56 @@ test.app.version = function ()
 } 
 
 #-------------------------------------------------------------------------------
-test.deleteNetworkTableColumn = function ()
+test.deleteTableColumn = function ()
 {
-    title = 'test.deleteNetworkTableColumn'
+    title = 'test.deleteTableColumn'
     test.prep (title,FALSE)
     
     openSession()
 
-    networkTableColumnNames <- getTableColumnNames(table = 'network')
-    print(networkTableColumnNames)
-    deleteTableColumn('publication', table = 'network')
-    networkTableColumnNames <- getTableColumnNames(table = 'network')
-    print(networkTableColumnNames)
+    # network
+    table <- 'network'
+    columnToKeep <- 'name'
+    columnToDelete <- 'publication'
+
+    tableColumnNames <- getTableColumnNames(table = table)
+    checkTrue (columnToKeep %in% tableColumnNames)
+    checkTrue (columnToDelete %in% tableColumnNames)
+
+    deleteTableColumn(columnToDelete, table = table)
+
+    tableColumnNames <- getTableColumnNames(table = table)
+    checkTrue (columnToKeep %in% tableColumnNames)
+    checkTrue ( ! (columnToDelete %in% tableColumnNames) )
+
+    # node
+    table <- 'node'
+    columnToKeep <- 'name'
+    columnToDelete <- 'IsSingleNode'
+
+    tableColumnNames <- getTableColumnNames(table = table)
+    checkTrue (columnToKeep %in% tableColumnNames)
+    checkTrue (columnToDelete %in% tableColumnNames)
+
+    deleteTableColumn(columnToDelete, table = table)
+
+    tableColumnNames <- getTableColumnNames(table = table)
+    checkTrue (columnToKeep %in% tableColumnNames)
+    checkTrue ( ! (columnToDelete %in% tableColumnNames) )
+
+    # edge
+    table <- 'edge'
+    columnToKeep <- 'name'
+    columnToDelete <- 'EdgeBetweenness'
+
+    tableColumnNames <- getTableColumnNames(table = table)
+    checkTrue (columnToKeep %in% tableColumnNames)
+    checkTrue (columnToDelete %in% tableColumnNames)
+
+    deleteTableColumn(columnToDelete, table = table)
+
+    tableColumnNames <- getTableColumnNames(table = table)
+    checkTrue (columnToKeep %in% tableColumnNames)
+    checkTrue ( ! (columnToDelete %in% tableColumnNames) )
 
 }

@@ -44,7 +44,7 @@ elif [[ -n $Xvfb_pids ]]; then
 		done
 	fi
 else
-	echo 'cytoscape stopped'
+	echo 'cytoscape stopped' > /dev/stderr
 fi
 
 if [[ $(tmux ls 2> /dev/null) ]]; then
