@@ -17,8 +17,9 @@ This repo also has some useful code in `extras`:
 Update tests: `./test/update_test_RCy3.R.sh`
 Run tests: `./test/run.R`
 
-Why is the following error occasionally showing up:
->------- test.filters
-Error in checkEqualsNumeric(length(sel$nodes), 17) : 
-  Mean relative difference: 0.2142857
-Calls: run.tests -> test.filters -> checkEqualsNumeric
+Note a timing issue with `createCompositeFilter` in `test.filters` in
+`test/test_RCy3.R` may require a call to a `Sys.sleep` in order for the filter
+to finish being created before calling `checkEqualsNumeric`. Without this, we
+sometimes get the correct value of `17` but other times an incorrect value of
+`14`.
+

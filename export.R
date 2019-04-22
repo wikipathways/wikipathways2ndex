@@ -16,12 +16,9 @@ library(RCy3)
 source('./wikipathways2ndex.R')
 source('./wikipathways2cx.R')
 source('./get_pathways.R')
+source('./extra.R')
 
 BATCH_SIZE = 10
-
-get_value_by_key <- function(mylist, mykey) {
-	return(unname(unlist(lapply(mylist, function(x) x[mykey]))))
-}
 
 exportersByName <- list("cx"=wikipathways2cx, "ndex"=wikipathways2ndex)
 
@@ -59,8 +56,6 @@ export_subset <- function(outdir_raw, pathway_ids_batch, exporterName) {
 	})
 	return(results)
 }
-
-canBeInteger <- function(x) {grepl('^\\d+$', x)}
 
 option_list2 = list(
   make_option(c("--head"), type="numeric", default=Inf, 

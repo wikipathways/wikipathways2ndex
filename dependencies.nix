@@ -28,7 +28,7 @@ in [
   optparse
   purrr
   readr
-  rjson
+  jsonlite
   tidyr
   utf8
   # needed for running tests:

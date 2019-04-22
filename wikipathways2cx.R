@@ -1,11 +1,11 @@
 library(dplyr)
 library(here)
 library(RCy3)
-library(rjson)
+library(jsonlite)
 library(rWikiPathways)
 library(tidyr)
 
-source('./unify.R')
+#source('./unify.R')
 
 # Using dev version at present
 # https://github.com/wikipathways/cytoscape-wikipathways-app/blob/develop/WikiPathways-3.3.73.jar
@@ -17,13 +17,9 @@ wikipathways2cx <- function(CX_OUTPUT_DIR, wikipathwaysID) {
 	net.suid <- commandsGET(paste0('wikipathways import-as-pathway id="', wikipathwaysID, '"'))
 
 	pathwayInfo <- getPathwayInfo(wikipathwaysID)
-	print('pathwayInfo')
-	print(pathwayInfo)
 
 	ontologyTerms <- getOntologyTerms(wikipathwaysID)
 	diseaseOntologyTerms <- unlist(lapply(ontologyTerms[unname(unlist(lapply(ontologyTerms, function(x) {x["ontology"] == 'Disease'})))], function(x) {x[['name']]}))
-	print('diseaseOntologyTerms')
-	print(diseaseOntologyTerms)
     
 	# This code gets username, but not the actual name of the user.
 #	pathwayHistory <- getPathwayHistory(wikipathwaysID, 19700101)
@@ -88,10 +84,6 @@ wikipathways2cx <- function(CX_OUTPUT_DIR, wikipathwaysID) {
 
 	# save as cx
 	exportResponse <- exportNetwork(filename=filepath_san_ext, type='CX')
-	print(paste0("ls ", CX_OUTPUT_DIR))
-	system(paste0("ls ", CX_OUTPUT_DIR))
-	system("pwd")
-	system(paste0("cp -r ", CX_OUTPUT_DIR, " ./cxo"))
 	# TODO: right now, exportResponse only has one named item: 'file'.
 	# But it should also include the status info from the cx. 
 	# Then w could possibly just use exportResponse instead of making the

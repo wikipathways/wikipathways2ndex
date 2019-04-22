@@ -7,7 +7,7 @@ library(httr)
 library(ndexr)
 
 library(RCy3)
-library(rjson)
+library(jsonlite)
 library(rWikiPathways)
 library(tidyr)
 library(XML)
@@ -17,11 +17,20 @@ library(utf8)
 #installApp('WikiPathways')
 #system("bash ./install_dev_wikipathways_app.sh")
 
-source('./get_citation.R')
-source('./unify.R')
+source('./wikipathways_extra.R')
+source('./extra.R')
 
-contextFile <- here("./context.json")
-CONTEXT <- readChar(contextFile, file.info(contextFile)$size)
+MARKER_MAPPINGS <- fromJSON('./MarkerMappings.json')
+VALUE_MAPPINGS <- fromJSON('./ValueMappings.json')
+SBO_IRI_BY_TERM <- fromJSON('./interaction-type.jsonld')[['@context']]
+TERM_BY_SBO_IRI <- SBO_IRI_BY_TERM %>%
+  lmap(function(x) {
+    term <- names(x)
+    IRI <- unlist(x)
+    result <- list()
+    result[[IRI]] <- term
+    return(result)
+  })
 
 # TODO: should be able to get NDEX_USER_UUID from NDEX_USER or vice versa
 NDEX_USER_UUID <- Sys.getenv("NDEX_USER_UUID")
@@ -40,14 +49,14 @@ if (NDEX_USER == 'wikipathways') {
 	# for testing
 	NDEX_HOST="dev2.ndexbio.org"
 
-#	# for the set named 'testing'
-#	NETWORKSET_ID <- '7dbe0e40-5c05-11e9-831d-0660b7976219'
-#
-#	# for the set named 'wikipathways-gpml-Homo_sapiens'
+	# for the set named 'testing'
+	NETWORKSET_ID <- '7dbe0e40-5c05-11e9-831d-0660b7976219'
+
+	# for the set named 'wikipathways-gpml-Homo_sapiens'
 #	NETWORKSET_ID <- 'b44b7ca7-4da1-11e9-9fc6-0660b7976219'
 
 	# for the set named 'wikipathways-20190412-gpml-Homo_sapiens'
-	NETWORKSET_ID <- '6ecc6399-5d56-11e9-831d-0660b7976219'
+#	NETWORKSET_ID <- '6ecc6399-5d56-11e9-831d-0660b7976219'
 }
 
 NDEX_SERVER_URL=paste0("http://", NDEX_HOST, "/v2")
@@ -62,8 +71,6 @@ if (NDEX_USER == '' || NDEX_PWD == '') {
 	stop(message)
 } else {
 	ndexcon <- ndex_connect(username=NDEX_USER, password=NDEX_PWD, host=NDEX_HOST, ndexConf=ndex_config$Version_2.0)
-	print('ndexcon')
-	print(ndexcon)
 }
 
 # TODO: should we set the following?
@@ -77,232 +84,261 @@ makeHtmlLink <- function(IRI, text = '') {
 	return(htmlLink)
 }
 
-# see https://stackoverflow.com/a/19655909
-is.blank <- function(x, false.triggers=FALSE){
-	if(is.function(x)) return(FALSE)
-	# Some of the tests below trigger
-	# warnings when used on functions
-		return(
-			is.null(x) ||                # Actually this line is unnecessary since
-			length(x) == 0 ||            # length(NULL) = 0, but I like to be clear
-			all(is.na(x)) ||
-			all(x=="") ||
-			(false.triggers && all(!x))
-		)
-}
-
-canBeInteger <- function(x) {grepl('^\\d+$', x)}
-cannotBeInteger <- function(x) {!grepl('^\\d+$', x)}
-
-updateNetworkTable <- function(networkName, columnName, columnValue) {
-	updatedNetworkTableColumns <- data.frame(name = networkName, columnName = columnValue, stringsAsFactors=FALSE)
-	colnames(updatedNetworkTableColumns) <- c('name', columnName)
-	row.names(updatedNetworkTableColumns) <- c(networkName)
-	# TODO: use SUID here as matching key 
-	loadTableData(updatedNetworkTableColumns, table = 'network')
-}
-
 wikipathways2ndex <- function(CX_OUTPUT_DIR, wikipathwaysID) {
 	result <- list()
 	tryCatch({
-		ndexVersion = format(Sys.time(), "%Y%m%d")
 		print(paste('Processing wikipathwaysID:', wikipathwaysID, '...'))
+		result <- load_wikipathways_pathway(wikipathwaysID)
 
-		# TODO: why does net.suid != suid, as gotten later on?
-		net.suid <- commandsGET(paste0('wikipathways import-as-pathway id="', wikipathwaysID, '"'))
+		networkTableColumnNames <- getTableColumnNames(table = 'network')
+		networkTableColumns <- getTableColumns(table = 'network', columns = 'wikipathwaysIRI,name,title,organism,description')
 
-		# FROM WIKIPATHWAYS APP
-		networkTableColumns <- getTableColumns(table = 'network', columns = 'name,title,organism,description,pmids')
-
-		nameInitial <- networkTableColumns[["name"]]
+		nameForCytoscape <- networkTableColumns[["name"]]
 		title <- networkTableColumns[["title"]]
 		organism <- networkTableColumns[["organism"]]
 		description <- networkTableColumns[["description"]]
-		raw_pmids <- networkTableColumns[["pmids"]]
-		if (!is.blank(raw_pmids)) {
-			pathway_raw_pmids = paste(wikipathwaysID, raw_pmids, sep = ': ')
-			cat(pathway_raw_pmids, file=here("raw_pmids.txt"), append=TRUE, sep = "\n")
-			pmids <- as.integer(Filter(canBeInteger, unlist(strsplit(raw_pmids, "\\s*,\\s*"))))
-			if (!is.blank(pmids)) {
-				pmIRIs <- paste(map(pmids, function(pmid) {
-					return(paste0('pubmed:', pmid))
-				}), collapse = '; ')
 
-				updateNetworkTable(nameInitial, "pmids", pmIRIs)
+		nameForNDEx <- paste(wikipathwaysID, title, organism, sep = ' - ')
+		renameNetwork(nameForNDEx)
 
-				# TODO: decide with Rudi and Alex what to do here
-#				# NOTE: Rudi said use the latest if there are multiple
-#				pubmedID <- max(pmids)
-#
-#				# format as HTML IRI link
-#				pubmedIRI <- paste0('https://identifiers.org/pubmed/', pubmedID)
-#				metadata[["reference"]] <- makeHtmlLink(pubmedIRI, paste('PMID', pubmedID))
-#
-#				# format as HTML citation
-#				citation <- get_citation(pubmedID)
-#				metadata[["reference"]] <- citation
-			}
-			notpmids <- Filter(cannotBeInteger, unlist(strsplit(raw_pmids, "\\s*,\\s*")))
-			if (length(notpmids) > 0) {
-				pathway_text = paste(wikipathwaysID, paste(notpmids, collapse = ', '), sep = ': ')
-				cat(pathway_text, file=here("notpmids.txt"), append=TRUE, sep = "\n")
-			}
-		}
+		updateNetworkTable(nameForNDEx, "rightsHolder", 'WikiPathways')
 
+		# TODO: the NDEx docs say to make our own HTML for CC0:
+		# http://home.ndexbio.org/publishing-in-ndex/#rights
+		# But Rudi or Alex said to just use the CC0 string.
+		renameTableColumn('license', 'rights', table = 'network')
 
-		# FROM WEBSERVICE
-		pathwayInfo <- getPathwayInfo(wikipathwaysID)
-		#wikipathwaysID <- pathwayInfo[1]
-		#url <- pathwayInfo[2]
+		updateNetworkTable(nameForNDEx, "author", 'WikiPathways team')
 
-		updateNetworkTable(nameInitial, "@context", list("@context"=CONTEXT))
+		# version for NDEx is a datestamp
+		updateNetworkTable(nameForNDEx, "version", format(Sys.time(), "%Y%m%d"))
 
-		if (is.blank(title)) {
-			title <- pathwayInfo[3]
-			#write(paste("Warning: title not found by cytoscape app but was by getPathwayInfo in wikipathways2ndex.R:", title), stderr())
-			updateNetworkTable(nameInitial, "title", title)
-		}
+		updateNetworkTable(nameForNDEx, "networkType", 'pathway')
 
-		if (is.blank(organism)) {
-			organism <- pathwayInfo[4]
-			#write(paste("Warning: organism not found by cytoscape app but was by getPathwayInfo in wikipathways2ndex.R:", organism), stderr())
-			updateNetworkTable(nameInitial, "organism", organism)
-		}
+		nodeTableColumnNames <- getTableColumnNames()
+		# Only map Ensembl to HGNC for Human
+		if (organism == 'Homo sapiens') {
+			sourceColumnName <- 'Ensembl'
+			targetColumnName <- 'HGNC'
+			# TODO: it appears I can't run mapTableColumn for mouse and human pathways in
+			# the same batch. Any of these combos work:
+			# * just WP1 (mouse)
+			# * just WP241 (human)
+			# * WP241, WP550, WP554 (human)
+			# but this fails:
+			# * WP1 (mouse) and WP241 (human)
 
-		wikipathwaysVersion <- pathwayInfo[5]
+			# if we get an error when trying to make node names use HGNC, we skip it and continue.
+			tryCatch({
+				# can't unify WP715, because it only has metabolites.
+				# Is Ensembl column missing?
+				if (sourceColumnName %in% nodeTableColumnNames) {
+					mapTableColumn(sourceColumnName, organism, sourceColumnName, targetColumnName)
 
-		if (is.blank(description)) {
-			#write("Warning: description not found by cytoscape app in wikipathways2ndex.R", stderr())
-			pathway_latin1 <- getPathway(wikipathwaysID)
-			Encoding(pathway_latin1) <- "latin1"
-			pathway <- as_utf8(pathway_latin1)
+					hgncified <- as_tibble(getTableColumns()) %>%
+						mutate("__gpml:textlabel"=name) %>%
+						mutate(name=ifelse(is.na(HGNC), name, HGNC))
 
-			# if we get an error when trying to get description, we skip it and continue.
-			description <- tryCatch({
-				#write("Trying to get description by getPathway in wikipathways2ndex.R", stderr())
-				# TODO: can't parse GPML for WP23. Complains about encoding.
-				pathwayParsed <- xmlTreeParse(pathway, asText = TRUE, useInternalNodes = TRUE, getDTD=FALSE)
-				# TODO: look into formatting description as HTML. Is the string wikitext?
-				# For example, '\n' could be '<br>'
-				descriptionCandidate <- xmlSerializeHook(getNodeSet(pathwayParsed,
-							 "/gpml:Pathway/gpml:Comment[@Source='WikiPathways-description']/text()",
-							 c(gpml = "http://pathvisio.org/GPML/2013a")))[[1]]
-				descriptionCandidate
+					## TODO: why do neither of the two lines below correctly update the name column?
+					## For example, try converting WP554 and verify that prostacyclin is now named GALNT13.
+					## But further update: that's wrong. prostacyclin is a metabolite.
+					#loadTableData(as.data.frame(hgncified))
+					#loadTableData(as.data.frame(hgncified), table.key.column = 'SUID')
+
+					## Maybe I need it's something about tidyr not using row names?
+					## We could take a look at using something like this:
+					## column_to_rownames(hgncified_df, var = "SUID")
+
+					# The following code does work, but couldn't it be simplified?
+					hgncified_df <- as.data.frame(hgncified)
+					row.names(hgncified_df) <- hgncified_df[["SUID"]]
+					loadTableData(hgncified_df, table.key.column = 'SUID')
+					nodeTableColumnNames <- getTableColumnNames()
+				}
 			}, warning = function(w) {
-				write(paste("Warning getting description in wikipathways2ndex.R:", w, sep = '\n'), stderr())
-				return('')
+				write(paste("Warning using HGNC for node names in wikipathways2ndex.R:", w, sep = '\n'), stderr())
+				NA
 			}, error = function(err) {
-				write(paste("Error getting description in wikipathways2ndex.R:", err, sep = '\n'), stderr())
-				return('')
+				write(paste("Error using HGNC for node names in wikipathways2ndex.R:", err, sep = '\n'), stderr())
+				NA
 			}, finally = {
 				# Do something
 			})
-			#write(paste("Warning: description not found by cytoscape app but was by getPathway in wikipathways2ndex.R:", description, sep = '\n'), stderr())
-
-			updateNetworkTable(nameInitial, "description", description)
 		}
 
-		name <- paste(wikipathwaysID, title, organism, sep = ' - ')
-		wikipathwaysIRI = paste0('http://identifiers.org/wikipathways/', wikipathwaysID, '_r', wikipathwaysVersion)
-
-		renameNetwork(name)
-
-		# replace any non-alphanumeric characters with underscore.
-		# TODO: what about dashes? BTW, the following doesn't work:
-		#filename <- paste0(gsub("[^[:alnum:\\-]]", "_", name))
-		filename <- paste0(gsub("[^[:alnum:]]", "_", name))
-		filepath_san_ext <- file.path(CX_OUTPUT_DIR, filename)
-
-		# TODO: should we reference DataNodes of type Pathway with WithPathways IDs as NDEx subnetworks?
-		metadata <- list(author = 'WikiPathways team',
-				 wikipathwaysIRI = makeHtmlLink(wikipathwaysIRI),
-				 wikipathwaysID = wikipathwaysID,
-				 wikipathwaysVersion = wikipathwaysVersion,
-				 version = ndexVersion,
-				 rightsHolder = 'WikiPathways',
-				 # TODO: the docs say to make our own HTML for CC0.
-				 # see http://home.ndexbio.org/publishing-in-ndex/#rights
-				 # which of the following options should we use?
-				 # Our license language here: https://www.wikipathways.org/index.php/WikiPathways:License_Terms#The_License.2FWaiver
-				 rights = 'Waiver-No Rights Reserved (CC0)',
-				 #rights = '<p xmlns:dct="http://purl.org/dc/terms/"> <a rel="license" href="http://creativecommons.org/publicdomain/zero/1.0/"> <img src="http://i.creativecommons.org/p/zero/1.0/88x31.png" style="border-style: none;" alt="CC0" /> </a> <br /> To the extent possible under law, <a rel="dct:publisher" href="https://www.wikipathways.org">https://www.wikipathways.org</a> has waived all copyright and related or neighboring rights to this work. </p>',
-				 networkType = 'pathway'
-				 # Disabled the following, because it's being handled by @context
-#			  	 # TODO: update to be able to handle non-human
-#				 organism = paste('Human', '9606', organism, sep = '; ')
-				 )
-
-		ontologyTerms <- getOntologyTerms(wikipathwaysID)
-		pathwayOntologyTerms <- unlist(lapply(ontologyTerms[unname(unlist(lapply(ontologyTerms, function(x) {x["ontology"] == 'Pathway Ontology'})))], function(x) {x[['name']]}))
-
-		if (length(pathwayOntologyTerms) > 0) {
-			metadata[["labels"]] <- paste(append(c(wikipathwaysID), pathwayOntologyTerms), collapse = '; ')
-		}
-
-		cellTypeOntologyTerms <- unlist(lapply(ontologyTerms[unname(unlist(lapply(ontologyTerms, function(x) {x["ontology"] == 'Cell Type'})))], function(x) {x[['name']]}))
-		if (length(cellTypeOntologyTerms) > 0) {
-			# cell type isn't exactly tissue
-			metadata[["cell"]] <- paste(cellTypeOntologyTerms, collapse = '; ')
-		}
-
-		diseaseOntologyTerms <- unlist(lapply(ontologyTerms[unname(unlist(lapply(ontologyTerms, function(x) {x["ontology"] == 'Disease'})))], function(x) {x[['name']]}))
-		if (length(diseaseOntologyTerms) > 0) {
-			metadata[["disease"]] <- paste(diseaseOntologyTerms, collapse = '; ')
-		}
-	    
-		# if we get an error when trying to unify, we skip it and continue.
 		tryCatch({
-			# TODO: can't unify WP715, because it only has metabolites. Complains about HGNC column missing.
-			unify(organism)
+			edgeTable <- as_tibble(getTableColumns(table = 'edge')) %>%
+				mutate(start_normalized=map_chr(StartArrow, function(StartArrow) {
+					return(VALUE_MAPPINGS[[StartArrow]])
+				})) %>%
+				mutate(end_normalized=map_chr(EndArrow, function(EndArrow) {
+					return(VALUE_MAPPINGS[[EndArrow]])
+				})) %>%
+				mutate(normalized=ifelse(end_normalized != 'none', end_normalized, start_normalized)) %>%
+				mutate(sboType=map_chr(normalized, function(normalized) {
+					sboType <- NA
+					if (hasName(MARKER_MAPPINGS[[normalized]], 'sbo')) {
+						sboType <- MARKER_MAPPINGS[[normalized]][['sbo']]
+					} else {
+						sboType <- 'SBO:0000374'
+					}
+					return(paste0(sboType, collapse = ', '))
+					#return(toJSON(sboType, auto_unbox = TRUE))
+				})) %>%
+				mutate(type=map_chr(normalized, function(normalized) {
+					biopaxTypes <- c()
+					if (hasName(MARKER_MAPPINGS[[normalized]], 'bp')) {
+						biopaxType <- paste0('biopax:', MARKER_MAPPINGS[[normalized]][['bp']][['name']])
+						biopaxTypes <- c(biopaxType)
+					}
+
+					sboTypes <- c()
+					if (hasName(MARKER_MAPPINGS[[normalized]], 'sbo')) {
+						sboTypes <- MARKER_MAPPINGS[[normalized]][['sbo']]
+					} else {
+						sboTypes <- c('SBO:0000374')
+					}
+
+					sboTypeLinks <- sboTypes %>%
+						map(function(sboType) {
+							IRI <- paste0("http://identifiers.org/biomodels.sbo/", sboType)
+							sboTypeLink <- makeHtmlLink(IRI = IRI,
+									    text = TERM_BY_SBO_IRI[[IRI]])
+							return(sboTypeLink)
+						})
+
+					wikipathwaysTypeLinks <- c()
+					if (hasName(MARKER_MAPPINGS[[normalized]], 'wp')) {
+						wikipathwaysType <- paste0('wikipathways:', MARKER_MAPPINGS[[normalized]][['wp']])
+						wikipathwaysTypeLink <- makeHtmlLink(IRI = gsub(
+										      "wikipathways:",
+										      "http://vocabularies.wikipathways.org/wp#",
+										      wikipathwaysType),
+								    text = wikipathwaysType)
+						wikipathwaysTypeLinks <- c(wikipathwaysTypeLink)
+					}
+					#return(paste(sboTypeLinks, biopaxType, wikipathwaysTypeLinks, collapse = ', ', sep = ', '))
+					return(paste0(purrr::flatten(list(sboTypeLinks, wikipathwaysTypeLinks, biopaxTypes)), collapse = ', '))
+					#return(paste0(sboTypeLinks, biopaxType, collapse = ', '))
+				})) %>%
+				select(sboType, type, SUID)
+
+##			## Maybe I need it's something about tidyr not using row names?
+##			## We could take a look at using something like this:
+##			## column_to_rownames(hgncified_df, var = "SUID")
+##
+			# The following code does work, but couldn't it be simplified?
+			edgeTable_df <- as.data.frame(edgeTable)
+			row.names(edgeTable_df) <- edgeTable_df[["SUID"]]
+			loadTableData(edgeTable_df, table.key.column = 'SUID', table = 'edge')
 		}, warning = function(w) {
-			write(paste("Warning during unify in wikipathways2ndex.R:", w, sep = '\n'), stderr())
+			write(paste("Warning mapping edge types in wikipathways2ndex.R:", w, sep = '\n'), stderr())
 			NA
 		}, error = function(err) {
-			write(paste("Error during unify in wikipathways2ndex.R:", err, sep = '\n'), stderr())
+			write(paste("Error mapping edge types in wikipathways2ndex.R:", err, sep = '\n'), stderr())
 			NA
 		}, finally = {
 			# Do something
 		})
 
-		filepathCx <- paste0(filepath_san_ext, '.cx')
-		filepathCys <- paste0(filepath_san_ext, '.cys')
 
-		closeSession(TRUE, filename=filepath_san_ext)
-		openSession(file.location=filepathCys)
+		# TODO: should we reference DataNodes of type Pathway with WithPathways IDs as NDEx subnetworks?
 
-		tableColumnsPreCys <- getTableColumns()
+		metadata <- list(labels=c(wikipathwaysID))
+		if ("pathwayOntologyTag" %in% networkTableColumnNames) {
+			pathwayOntologyTerms <- fromJSON(
+							getTableColumns(
+								table = 'network',
+								columns = 'pathwayOntologyTag')[['pathwayOntologyTag']]) %>%
+				as_tibble()
+			pathwayOntologyTermsHTML <- pathwayOntologyTerms %>%
+				pmap(function(id, name) {
+					makeHtmlLink(IRI = gsub("PW:", "https://identifiers.org/pw/PW:", id), text = name)
+				})
+			metadata[["labels"]] <- paste(append(metadata[["labels"]], pathwayOntologyTermsHTML), collapse = ', ')
 
-		i <- sapply(tableColumnsPreCys, is.factor)
-		tableColumnsPreCys[i] <- lapply(tableColumnsPreCys[i], as.character)
+			deleteTableColumn('pathwayOntologyTag', table = 'network')
+			metadata[["__wikipathways:pathwayOntologyTag"]] <- paste0(pathwayOntologyTerms$id, collapse = ', ')
+			#updateNetworkTable(nameForNDEx, "__wikipathways:pathwayOntologyTag", pathwayOntologyTerms$id)
+		}
 
+		if ("celltypeOntologyTag" %in% networkTableColumnNames) {
+			celltypeOntologyTerms <- fromJSON(
+							getTableColumns(
+								table = 'network',
+								columns = 'celltypeOntologyTag')[['celltypeOntologyTag']]) %>%
+				as_tibble()
 
-		CYTOSCAPE_NA<-""
-		tableColumnsCorrected <- as.data.frame(
-						       as_tibble(tableColumnsPreCys) %>%
-							       replace(.=="NULL", CYTOSCAPE_NA) %>%
-							       replace(.=="null", CYTOSCAPE_NA) %>%
-							       replace(.=="", CYTOSCAPE_NA) %>%
-							       replace(.=="NA", CYTOSCAPE_NA) %>%
-							       replace(.=="<NA>", CYTOSCAPE_NA) %>%
-							       replace(.==NA, CYTOSCAPE_NA) %>%
-							       replace(is.null(.), CYTOSCAPE_NA) %>%
-							       replace(is.na(.), CYTOSCAPE_NA)
-						       )
-		loadTableData(as.data.frame(tableColumnsCorrected), table.key.column = 'SUID')
+			celltypeOntologyTermsHTML <- celltypeOntologyTerms %>%
+				pmap(function(id, name) {
+					makeHtmlLink(IRI = gsub("CL:", "https://identifiers.org/cl/CL:", id), text = name)
+				})
 
-#		# Some or all of these are actually Groups
-#		emptyNodes <- as_tibble(tableColumnsPreCys) %>%
-#			filter(is.na(GraphID) | is.null(GraphID) | GraphID == "")
-#
-#		selectNodes(emptyNodes$SUID)
-#		deleteSelectedNodes()
+			# cell type isn't exactly tissue
+			metadata[["cell"]] <- paste(celltypeOntologyTermsHTML, collapse = ', ')
 
-		tableColumnsCorrectedLoaded <- getTableColumns()
+			deleteTableColumn('celltypeOntologyTag', table = 'network')
+			metadata[["__wikipathways:celltypeOntologyTag"]] <- paste0(celltypeOntologyTerms$id, collapse = ', ')
+			#updateNetworkTable(nameForNDEx, "__wikipathways:celltypeOntologyTag", celltypeOntologyTerms$id)
+		}
 
-		result[["name"]] <- name
+		if ("diseaseOntologyTag" %in% networkTableColumnNames) {
+			diseaseOntologyTerms <- fromJSON(
+							getTableColumns(
+								table = 'network',
+								columns = 'diseaseOntologyTag')[['diseaseOntologyTag']]) %>%
+				as_tibble()
+			diseaseOntologyTermsHTML <- diseaseOntologyTerms %>%
+				pmap(function(id, name) {
+					makeHtmlLink(IRI = gsub("DOID:", "https://identifiers.org/doid/DOID:", id), text = name)
+				})
 
-		renameTableColumn('pmids', 'gpml:hasPublicationXref', table = 'network')
-		renameTableColumn('title', 'gpml:name', table = 'network')
+			metadata[["disease"]] <- paste(diseaseOntologyTermsHTML, collapse = ', ')
+
+			deleteTableColumn('diseaseOntologyTag', table = 'network')
+			metadata[["__wikipathways:diseaseOntologyTag"]] <- paste0(diseaseOntologyTerms$id, collapse = ', ')
+			#updateNetworkTable(nameForNDEx, "__wikipathways:diseaseOntologyTag", diseaseOntologyTerms$id)
+		}
+
+		result[["name"]] <- nameForNDEx
+
+		if ("pmids" %in% networkTableColumnNames) {
+			pmids <- fromJSON(
+					getTableColumns(
+						table = 'network',
+						columns = 'pmids')[["pmids"]])
+			pmidsHTML <- list(pmids) %>%
+				pmap(function(pmid) {
+					makeHtmlLink(IRI = gsub("pubmed:", "https://identifiers.org/pubmed:", pmid), text = pmid)
+				})
+
+			metadata[["citations"]] <- paste(pmidsHTML, collapse = ', ')
+			#metadata[["citationsList"]] <- toJSON(pmids, auto_unbox = TRUE)
+			metadata[["citationsList"]] <- toJSON(pmids, auto_unbox = FALSE)
+
+			deleteTableColumn('pmids', table = 'network')
+			metadata[["__gpml:hasPublicationXref"]] <- paste0(pmids, collapse = ', ')
+			#renameTableColumn('pmids', '__gpml:hasPublicationXref', table = 'network')
+		}
+
+		renameTableColumn('title', '__gpml:name', table = 'network')
+		renameTableColumn('GraphID', '__gpml:GraphID', table = 'node')
+		if ('GroupID' %in% nodeTableColumnNames) {
+			renameTableColumn('GroupID', '__gpml:GroupID', table = 'node')
+		}
+		renameTableColumn('XrefDatasource', '__gpml:XrefDatasource', table = 'node')
+		renameTableColumn('XrefId', '__gpml:XrefId', table = 'node')
+
+#		# TODO: should we change these?
+#		renameTableColumn('ConnectorType', '__gpml:connectorType', table = 'edge')
+#		renameTableColumn('LineThickness', '__gpml:lineThickness', table = 'edge')
+#		renameTableColumn('LineStyle', '__gpml:lineStyle', table = 'edge')
+#		renameTableColumn('Color', '__gpml:color', table = 'edge')
+#		renameTableColumn('Type', '__gpml:type', table = 'edge')
+
+		deleteTableColumn('row.names', table = 'network')
+		deleteTableColumn('row.names', table = 'node')
+		deleteTableColumn('row.names', table = 'edge')
 
 		suid <- getNetworkSuid(NULL, "http://localhost:1234/v1")
 
@@ -344,9 +380,6 @@ wikipathways2ndex <- function(CX_OUTPUT_DIR, wikipathwaysID) {
 			filter(!is.na(wikipathwaysID)& wikipathwaysID == !!wikipathwaysID & !isDeleted))$externalId
 
 		matchingNetworkCount <- length(matchingNetworkIds)
-
-		deleteTableColumn('row.names', table = 'network')
-
 		if (matchingNetworkCount > 0 && !is.blank(matchingNetworkIds)) {
 			print('Updating...')
 			if (matchingNetworkCount > 1) {
@@ -454,7 +487,14 @@ wikipathways2ndex <- function(CX_OUTPUT_DIR, wikipathwaysID) {
 ##			# 3. Try getting it by exporting as CX and opening
 ##			#    This method isn't working. It gives this message:
 ##			#    "This network is part of a Cytoscape collection and cannot be operated on or edited in NDEx."
+##
+##			# replace any non-alphanumeric characters with underscore.
+##			# TODO: what about dashes? BTW, the following doesn't work:
+##			#filename <- paste0(gsub("[^[:alnum:\\-]]", "_", name))
+##			filename <- paste0(gsub("[^[:alnum:]]", "_", nameForNDEx))
+##			filepath_san_ext <- file.path(CX_OUTPUT_DIR, filename)
 ##			exportNetwork(filename=filepath_san_ext, type='CX')
+##			filepathCx <- paste0(filepath_san_ext, '.cx')
 ##			cx <- readLines(filepathCx, warn=FALSE)
 ##			rcx <- rcx_fromJSON(cx)
 ##			#rcx <- rcx_asNewNetwork(rcx)
@@ -486,7 +526,6 @@ wikipathways2ndex <- function(CX_OUTPUT_DIR, wikipathwaysID) {
 		} else {
 			# NOTE: we need to use cyrestPOST in order to submit to the test/dev2 server.
 			# exportNetworkToNDEx only submits to production server.
-			exportNetwork(filename=filepath_san_ext, type='CX')
 			print('Creating...')
 			res <- cyrestPOST(paste('networks', suid, sep = '/'),
 				      body = list(serverUrl=NDEX_SERVER_URL,
@@ -517,13 +556,27 @@ wikipathways2ndex <- function(CX_OUTPUT_DIR, wikipathwaysID) {
 			  )
 		stop_for_status(r)
 
+#		# the code below is supposed to send a list of strings:
+#		# but it's returning a 500 error:
+#		rProperties <- PUT(
+#			 paste(NDEX_SERVER_URL, 'network', networkId, 'properties', sep = '/'),
+#			 body = list(predicateString="mykey", dataType="string", value="myvalue"),
+#			 encode = "json",
+#			 authenticate(NDEX_USER, NDEX_PWD)
+#			 )
+#		print(rProperties)
+#		print(str(rProperties))
+#		stop_for_status(rProperties)
+
 		# if we get an error when trying to make readOnly, we ignore it and continue.
 		tryCatch({
-			# the ndexr package doesn't support index_level="ALL", so I need to use httr instead
-			#ndex_network_set_systemProperties(ndexcon, networkId, readOnly=TRUE, visibility="PUBLIC", showcase=TRUE)
+			# the ndexr package doesn't support index_level="ALL", so instead
+		        # I need to use httr and work directly with the webservice
 			r <- PUT(
 				 paste(NDEX_SERVER_URL, 'network', networkId, 'systemproperty', sep = '/'),
-				 body = list(readOnly=TRUE, visibility="PUBLIC", showcase=TRUE, index_level="ALL"),
+				 # showcase=FALSE because the network _set_ is showcased,
+				 # not each individual network
+				 body = list(readOnly=TRUE, visibility="PUBLIC", showcase=FALSE, index_level="ALL"),
 				 encode = "json",
 				 authenticate(NDEX_USER, NDEX_PWD)
 				 )
@@ -548,6 +601,7 @@ wikipathways2ndex <- function(CX_OUTPUT_DIR, wikipathwaysID) {
 	}, interrupt = function(i) {
 		stop('Interrupted wikipathways2ndex.R')
 	}, finally = {
+		# what if the session is already closed?
 		closeSession(FALSE)
 	})
 
