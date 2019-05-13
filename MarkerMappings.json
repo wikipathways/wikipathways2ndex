@@ -4,9 +4,7 @@
       "name": "Interaction"
     },
     "sbo": [
-      "SBO:0000167",
-      "SBO:0000393",
-      "SBO:0000394"
+      "SBO:0000375"
     ],
     "wp": "DirectedInteraction"
   },
@@ -126,7 +124,8 @@
     "sbo": [
       "SBO:0000183",
       "SBO:0000184"
-    ]
+    ],
+    "wp": "TranscriptionTranslation"
   },
   "none": {
     "bp": {
@@ -135,6 +134,6 @@
     "sbo": [
       "SBO:0000374"
     ],
-    "wp": "TranscriptionTranslation"
+    "wp": "Interaction"
   }
 }
