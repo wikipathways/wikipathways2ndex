@@ -20,11 +20,20 @@ source('./extra.R')
 
 BATCH_SIZE = 10
 
-exportersByName <- list("cx"=wikipathways2cx, "ndex"=wikipathways2ndex)
+exportersByName <- list(
+			"cx"=list(
+				preprocessor=function() {return(list())},
+				exporter=wikipathways2cx
+				),
+			"ndex"=list(
+				preprocessor=wikipathways2ndexPreprocess,
+				exporter=wikipathways2ndex
+				)
+			)
 
-export_subset <- function(outdir_raw, pathway_ids_batch, exporterName) {
+export_subset <- function(outdir_raw, exporterName, preprocessed, pathway_ids_batch) {
 	outdir <- normalizePath(outdir_raw)
-	exporter <- exportersByName[exporterName][[1]]
+	exporter <- exportersByName[exporterName][[1]]$exporter
 	if (!is.function(exporter)){
 		print_help(parser)
 		stop("valid exporter must be specified.n", call.=FALSE)
@@ -35,7 +44,7 @@ export_subset <- function(outdir_raw, pathway_ids_batch, exporterName) {
 	results <- list()
 	tryCatch({
 		results <- tibble(pathway_id=pathway_ids_batch) %>%
-			mutate(returned=map(pathway_id, function(pathway_id) {exporter(outdir, pathway_id)})) %>%
+			mutate(returned=map(pathway_id, function(pathway_id) {exporter(outdir, preprocessed, pathway_id)})) %>%
 			mutate(name=map_chr(returned, "name")) %>%
 			mutate(response=map_chr(returned, "response")) %>%
 			mutate(success=map_lgl(returned, "success")) %>%
@@ -114,10 +123,14 @@ tryCatch({
 		pathway_ids <- tail(pathway_ids, options$tail)
 	}
 
+	preprocessor <- exportersByName[exporterName][[1]]$preprocessor
+	preprocessed <- preprocessor()
+
+	# TODO: look at wikipathways2ndex regarding grouping by organism
 	for (pathway_ids_batch in split(pathway_ids, ceiling(seq_along(pathway_ids)/BATCH_SIZE))) {
 		print('pathway_ids_batch')
 		print(pathway_ids_batch)
-		results <- export_subset(outdir_raw, pathway_ids_batch, exporterName)
+		results <- export_subset(outdir_raw, exporterName, preprocessed, pathway_ids_batch)
 		print(as.data.frame(results))
 	}
 }, warning = function(w) {

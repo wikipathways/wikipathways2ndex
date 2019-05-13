@@ -43,23 +43,28 @@ if (NDEX_USER == 'wikipathways') {
 	# for production
 	NDEX_HOST="ndexbio.org"
 
-	# for the set named 'wikipathways-gpml-Homo_sapiens'
+	# for the set named 'testing' on the production server
+	#NETWORKSET_ID <- '49867158-6dd5-11e9-848d-0ac135e8bacf'
+
+	# for the set named 'WikiPathways Collection - Homo sapiens' on the production server
 	NETWORKSET_ID <- '453c1c63-5c10-11e9-9f06-0ac135e8bacf'
 } else {
 	# for testing
 	NDEX_HOST="dev2.ndexbio.org"
 
-	# for the set named 'testing'
-	NETWORKSET_ID <- '7dbe0e40-5c05-11e9-831d-0660b7976219'
+	# for the set named 'testing' on the test server
+	#NETWORKSET_ID <- '7dbe0e40-5c05-11e9-831d-0660b7976219'
 
-	# for the set named 'wikipathways-gpml-Homo_sapiens'
-#	NETWORKSET_ID <- 'b44b7ca7-4da1-11e9-9fc6-0660b7976219'
+	# for the set named 'wikipathways-gpml-Homo_sapiens' on the test server
+	NETWORKSET_ID <- 'b44b7ca7-4da1-11e9-9fc6-0660b7976219'
 
-	# for the set named 'wikipathways-20190412-gpml-Homo_sapiens'
+	# for the set named 'wikipathways-20190412-gpml-Homo_sapiens' on the test server
 #	NETWORKSET_ID <- '6ecc6399-5d56-11e9-831d-0660b7976219'
 }
 
 NDEX_SERVER_URL=paste0("http://", NDEX_HOST, "/v2")
+
+RCY3_SUPPORTED_NDEX_HOSTS <- c("ndexbio.org")
 
 ndexcon <- NA
 if (NDEX_USER == '' || NDEX_PWD == '') {
@@ -84,7 +89,89 @@ makeHtmlLink <- function(IRI, text = '') {
 	return(htmlLink)
 }
 
-wikipathways2ndex <- function(CX_OUTPUT_DIR, wikipathwaysID) {
+# returns a list of network ids
+getNetworksInSet <- function() {
+	networks <- list()
+	tryCatch({
+		networks_r <- GET(
+			 paste(NDEX_SERVER_URL, 'networkset', NETWORKSET_ID, sep = '/'),
+			 accept_json(),
+			 authenticate(NDEX_USER, NDEX_PWD)
+			 )
+		stop_for_status(networks_r)
+		networksInSet <- content(networks_r)$networks
+
+		networks <- as_tibble(list(networkIdInSet=networksInSet)) %>%
+			mutate(data=map(networkIdInSet, function(networkIdInSet) {
+				returned <- tryCatch({
+					res <- ndex_network_get_summary(ndexcon, networkIdInSet)
+					externalId <- res$externalId
+					isDeleted <- res$isDeleted
+					properties <- res$properties
+					wikipathwaysIDRow <- properties[properties$predicateString == "wikipathwaysID" , ]
+					wikipathwaysID <- wikipathwaysIDRow$value
+					list(externalId=externalId, wikipathwaysID=wikipathwaysID, isDeleted=isDeleted)
+				}, warning = function(w) {
+					write(paste("Warning getting network summary in wikipathways2ndex.R:", w, sep = '\n'), stderr())
+					list(externalId=NA, wikipathwaysID=NA, isDeleted=NA)
+					#NA
+				}, error = function(err) {
+					write(paste("Error getting network summary in wikipathways2ndex.R:", err, sep = '\n'), stderr())
+					list(externalId=NA, wikipathwaysID=NA, isDeleted=NA)
+					#NA
+				}, finally = {
+					# Do something
+				})
+
+				return(returned)
+			})) %>%
+			mutate(externalId=map_chr(data, "externalId")) %>%
+			mutate(wikipathwaysID=map_chr(data, "wikipathwaysID")) %>%
+			mutate(isDeleted=map_lgl(data, "isDeleted"))
+
+	}, warning = function(w) {
+		write(paste("Warning in getNetworksInSet in wikipathways2ndex.R:", w, sep = '\n'), stderr())
+		NA
+	}, error = function(err) {
+		write(paste("Error in getNetworksInSet in wikipathways2ndex.R:", err, sep = '\n'), stderr())
+	}, interrupt = function(i) {
+		stop('Interrupted in getNetworksInSet in wikipathways2ndex.R')
+	}, finally = {
+		# Do something?
+	})
+
+	return(networks)
+}
+
+prepareNetworkSet <- function() {
+	print('Preparing network set...')
+
+	networks <- getNetworksInSet()
+	networkdIds <- as.list(networks$externalId)
+
+	# remove all networks from current set.
+	# we'll put them back later.
+	if (length(networks) > 0) {
+		r <- DELETE(
+			  paste(NDEX_SERVER_URL, 'networkset', NETWORKSET_ID, 'members', sep = '/'),
+			  body = networkdIds,
+			  encode = "json",
+			  authenticate(NDEX_USER, NDEX_PWD)
+			  )
+		stop_for_status(r)
+	}
+
+	return(networks)
+}
+
+wikipathways2ndexPreprocess <- function() {
+	networks <- prepareNetworkSet()
+	return(list(networksInSet=networks))
+}
+
+wikipathways2ndex <- function(CX_OUTPUT_DIR, preprocessed, wikipathwaysID) {
+	networksInSet <- preprocessed$networksInSet
+
 	result <- list()
 	tryCatch({
 		print(paste('Processing wikipathwaysID:', wikipathwaysID, '...'))
@@ -116,17 +203,26 @@ wikipathways2ndex <- function(CX_OUTPUT_DIR, wikipathwaysID) {
 		updateNetworkTable(nameForNDEx, "networkType", 'pathway')
 
 		nodeTableColumnNames <- getTableColumnNames()
-		# Only map Ensembl to HGNC for Human
+		edgeTableColumnNames <- getTableColumnNames(table = 'edge')
+
+		# Only map Ensembl to HGNC for Human, because we can't run
+		# mapTableColumn for a batch containing both mouse and human
+		# pathways.
+		#
+		# These work:
+		# * WP1 alone (mouse)
+		# * WP241 alone (human)
+		# * WP241, WP550, WP554 (human)
+		#
+		# But this fails:
+		# * WP1 (mouse) and WP241 (human)
+		#
+		# TODO: look at changing export.R to group pathways by organism so that
+		# every pathway in any given batch has the same organism as the other
+	       	# pathways in that batch.
 		if (organism == 'Homo sapiens') {
 			sourceColumnName <- 'Ensembl'
 			targetColumnName <- 'HGNC'
-			# TODO: it appears I can't run mapTableColumn for mouse and human pathways in
-			# the same batch. Any of these combos work:
-			# * just WP1 (mouse)
-			# * just WP241 (human)
-			# * WP241, WP550, WP554 (human)
-			# but this fails:
-			# * WP1 (mouse) and WP241 (human)
 
 			# if we get an error when trying to make node names use HGNC, we skip it and continue.
 			tryCatch({
@@ -166,91 +262,97 @@ wikipathways2ndex <- function(CX_OUTPUT_DIR, wikipathwaysID) {
 			})
 		}
 
-		tryCatch({
-			edgeTable <- as_tibble(getTableColumns(table = 'edge')) %>%
-				mutate(start_normalized=map_chr(StartArrow, function(StartArrow) {
-					return(VALUE_MAPPINGS[[StartArrow]])
-				})) %>%
-				mutate(end_normalized=map_chr(EndArrow, function(EndArrow) {
-					return(VALUE_MAPPINGS[[EndArrow]])
-				})) %>%
-				mutate(normalized=ifelse(end_normalized != 'none', end_normalized, start_normalized)) %>%
-				mutate(sboType=map_chr(normalized, function(normalized) {
-					sboType <- NA
-					if (hasName(MARKER_MAPPINGS[[normalized]], 'sbo')) {
-						sboType <- MARKER_MAPPINGS[[normalized]][['sbo']]
-					} else {
-						sboType <- 'SBO:0000374'
-					}
-					return(paste0(sboType, collapse = ', '))
-					#return(toJSON(sboType, auto_unbox = TRUE))
-				})) %>%
-				mutate(type=map_chr(normalized, function(normalized) {
-					biopaxTypes <- c()
-					if (hasName(MARKER_MAPPINGS[[normalized]], 'bp')) {
-						biopaxType <- paste0('biopax:', MARKER_MAPPINGS[[normalized]][['bp']][['name']])
-						biopaxTypes <- c(biopaxType)
-					}
+		if ('StartArrow' %in% edgeTableColumnNames && 'EndArrow' %in% edgeTableColumnNames) {
+			tryCatch({
+				edgeTable <- as_tibble(getTableColumns(table = 'edge')) %>%
+					mutate(start_normalized=map_chr(StartArrow, function(StartArrow) {
+						return(VALUE_MAPPINGS[[StartArrow]])
+					})) %>%
+					mutate(end_normalized=map_chr(EndArrow, function(EndArrow) {
+						return(VALUE_MAPPINGS[[EndArrow]])
+					})) %>%
+					mutate(normalized=ifelse(end_normalized != 'none', end_normalized, start_normalized)) %>%
+					mutate(sboType=map_chr(normalized, function(normalized) {
+						sboType <- NA
+						if (hasName(MARKER_MAPPINGS[[normalized]], 'sbo')) {
+							sboType <- MARKER_MAPPINGS[[normalized]][['sbo']]
+						} else {
+							sboType <- 'SBO:0000374'
+						}
+						return(paste0(sboType, collapse = ', '))
+						#return(toJSON(sboType, auto_unbox = TRUE))
+					})) %>%
+					mutate(type=map_chr(normalized, function(normalized) {
+						biopaxTypes <- c()
+						if (hasName(MARKER_MAPPINGS[[normalized]], 'bp')) {
+							biopaxType <- paste0('biopax:', MARKER_MAPPINGS[[normalized]][['bp']][['name']])
+							biopaxTypes <- c(biopaxType)
+						}
 
-					sboTypes <- c()
-					if (hasName(MARKER_MAPPINGS[[normalized]], 'sbo')) {
-						sboTypes <- MARKER_MAPPINGS[[normalized]][['sbo']]
-					} else {
-						sboTypes <- c('SBO:0000374')
-					}
+						sboTypes <- c()
+						if (hasName(MARKER_MAPPINGS[[normalized]], 'sbo')) {
+							sboTypes <- MARKER_MAPPINGS[[normalized]][['sbo']]
+						} else {
+							sboTypes <- c('SBO:0000374')
+						}
 
-					sboTypeLinks <- sboTypes %>%
-						map(function(sboType) {
-							IRI <- paste0("http://identifiers.org/biomodels.sbo/", sboType)
-							sboTypeLink <- makeHtmlLink(IRI = IRI,
-									    text = TERM_BY_SBO_IRI[[IRI]])
-							return(sboTypeLink)
-						})
+						sboTypeLinks <- sboTypes %>%
+							map(function(sboType) {
+								IRI <- paste0("http://identifiers.org/biomodels.sbo/", sboType)
+								sboTypeLink <- makeHtmlLink(IRI = IRI,
+										    text = TERM_BY_SBO_IRI[[IRI]])
+								return(sboTypeLink)
+							})
 
-					wikipathwaysTypeLinks <- c()
-					if (hasName(MARKER_MAPPINGS[[normalized]], 'wp')) {
-						wikipathwaysType <- paste0('wikipathways:', MARKER_MAPPINGS[[normalized]][['wp']])
-						wikipathwaysTypeLink <- makeHtmlLink(IRI = gsub(
-										      "wikipathways:",
-										      "http://vocabularies.wikipathways.org/wp#",
-										      wikipathwaysType),
-								    text = wikipathwaysType)
-						wikipathwaysTypeLinks <- c(wikipathwaysTypeLink)
-					}
-					#return(paste(sboTypeLinks, biopaxType, wikipathwaysTypeLinks, collapse = ', ', sep = ', '))
-					return(paste0(purrr::flatten(list(sboTypeLinks, wikipathwaysTypeLinks, biopaxTypes)), collapse = ', '))
-					#return(paste0(sboTypeLinks, biopaxType, collapse = ', '))
-				})) %>%
-				select(sboType, type, SUID)
+						wikipathwaysTypeLinks <- c()
+						if (hasName(MARKER_MAPPINGS[[normalized]], 'wp')) {
+							wikipathwaysType <- paste0('wikipathways:', MARKER_MAPPINGS[[normalized]][['wp']])
+							wikipathwaysTypeLink <- makeHtmlLink(IRI = gsub(
+											      "wikipathways:",
+											      "http://vocabularies.wikipathways.org/wp#",
+											      wikipathwaysType),
+									    text = wikipathwaysType)
+							wikipathwaysTypeLinks <- c(wikipathwaysTypeLink)
+						}
+						#return(paste(sboTypeLinks, biopaxType, wikipathwaysTypeLinks, collapse = ', ', sep = ', '))
+						return(paste0(purrr::flatten(list(sboTypeLinks, wikipathwaysTypeLinks, biopaxTypes)), collapse = ', '))
+						#return(paste0(sboTypeLinks, biopaxType, collapse = ', '))
+					})) %>%
+					select(sboType, type, SUID)
 
-##			## Maybe I need it's something about tidyr not using row names?
-##			## We could take a look at using something like this:
-##			## column_to_rownames(hgncified_df, var = "SUID")
-##
-			# The following code does work, but couldn't it be simplified?
-			edgeTable_df <- as.data.frame(edgeTable)
-			row.names(edgeTable_df) <- edgeTable_df[["SUID"]]
-			loadTableData(edgeTable_df, table.key.column = 'SUID', table = 'edge')
-		}, warning = function(w) {
-			write(paste("Warning mapping edge types in wikipathways2ndex.R:", w, sep = '\n'), stderr())
-			NA
-		}, error = function(err) {
-			write(paste("Error mapping edge types in wikipathways2ndex.R:", err, sep = '\n'), stderr())
-			NA
-		}, finally = {
-			# Do something
-		})
+	##			## Maybe I need it's something about tidyr not using row names?
+	##			## We could take a look at using something like this:
+	##			## column_to_rownames(hgncified_df, var = "SUID")
+	##
+				# The following code does work, but couldn't it be simplified?
+				edgeTable_df <- as.data.frame(edgeTable)
+				row.names(edgeTable_df) <- edgeTable_df[["SUID"]]
+				loadTableData(edgeTable_df, table.key.column = 'SUID', table = 'edge')
+			}, warning = function(w) {
+				write(paste("Warning mapping edge types in wikipathways2ndex.R:", w, sep = '\n'), stderr())
+				NA
+			}, error = function(err) {
+				write(paste("Error mapping edge types in wikipathways2ndex.R:", err, sep = '\n'), stderr())
+				NA
+			}, finally = {
+				# Do something
+			})
+		}
 
 
 		# TODO: should we reference DataNodes of type Pathway with WithPathways IDs as NDEx subnetworks?
 
 		metadata <- list(labels=c(wikipathwaysID))
 		if ("pathwayOntologyTag" %in% networkTableColumnNames) {
+			pathwayOntologyTag <- getTableColumns(
+					table = 'network',
+					columns = 'pathwayOntologyTag')[['pathwayOntologyTag']]
 			pathwayOntologyTerms <- fromJSON(
-							getTableColumns(
-								table = 'network',
-								columns = 'pathwayOntologyTag')[['pathwayOntologyTag']]) %>%
-				as_tibble()
+				getTableColumns(
+						table = 'network',
+						columns = 'pathwayOntologyTag')[['pathwayOntologyTag']]
+			) %>% as_tibble()
+
 			pathwayOntologyTermsHTML <- pathwayOntologyTerms %>%
 				pmap(function(id, name) {
 					makeHtmlLink(IRI = gsub("PW:", "https://identifiers.org/pw/PW:", id), text = name)
@@ -313,8 +415,7 @@ wikipathways2ndex <- function(CX_OUTPUT_DIR, wikipathwaysID) {
 				})
 
 			metadata[["citations"]] <- paste(pmidsHTML, collapse = ', ')
-			#metadata[["citationsList"]] <- toJSON(pmids, auto_unbox = TRUE)
-			metadata[["citationsList"]] <- toJSON(pmids, auto_unbox = FALSE)
+			#metadata[["citationsList"]] <- toJSON(pmids, auto_unbox = FALSE)
 
 			deleteTableColumn('pmids', table = 'network')
 			metadata[["__gpml:hasPublicationXref"]] <- paste0(pmids, collapse = ', ')
@@ -342,106 +443,98 @@ wikipathways2ndex <- function(CX_OUTPUT_DIR, wikipathwaysID) {
 
 		suid <- getNetworkSuid(NULL, "http://localhost:1234/v1")
 
-		networks_r <- GET(
-			 paste(NDEX_SERVER_URL, 'networkset', NETWORKSET_ID, sep = '/'),
-			 accept_json(),
-			 authenticate(NDEX_USER, NDEX_PWD)
-			 )
-		stop_for_status(networks_r)
-		setNetworks <- content(networks_r)$networks
-
-		matchingNetworkIds <- (as_tibble(list(setNetworkId=setNetworks)) %>%
-			mutate(data=map(setNetworkId, function(setNetworkId) {
-				returned <- tryCatch({
-					res <- ndex_network_get_summary(ndexcon, setNetworkId)
-					externalId <- res$externalId
-					isDeleted <- res$isDeleted
-					properties <- res$properties
-					wikipathwaysIDRow <- properties[properties$predicateString == "wikipathwaysID" , ]
-					wikipathwaysID <- wikipathwaysIDRow$value
-					list(externalId=externalId, wikipathwaysID=wikipathwaysID, isDeleted=isDeleted)
-				}, warning = function(w) {
-					write(paste("Warning getting network summary in wikipathways2ndex.R:", w, sep = '\n'), stderr())
-					list(externalId=NA, wikipathwaysID=NA, isDeleted=NA)
-					#NA
-				}, error = function(err) {
-					write(paste("Error getting network summary in wikipathways2ndex.R:", err, sep = '\n'), stderr())
-					list(externalId=NA, wikipathwaysID=NA, isDeleted=NA)
-					#NA
-				}, finally = {
-					# Do something
-				})
-
-				return(returned)
-			})) %>%
-			mutate(externalId=map_chr(data, "externalId")) %>%
-			mutate(wikipathwaysID=map_chr(data, "wikipathwaysID")) %>%
-			mutate(isDeleted=map_lgl(data, "isDeleted")) %>%
-			filter(!is.na(wikipathwaysID)& wikipathwaysID == !!wikipathwaysID & !isDeleted))$externalId
+		matchingNetworkIds <- (networksInSet %>%
+			filter(!is.na(wikipathwaysID) & wikipathwaysID == !!wikipathwaysID & !isDeleted))$externalId
 
 		matchingNetworkCount <- length(matchingNetworkIds)
 		if (matchingNetworkCount > 0 && !is.blank(matchingNetworkIds)) {
 			print('Updating...')
+
 			if (matchingNetworkCount > 1) {
-				write(paste0("Warning ", matchingNetworkCount, " matching networks (just 0 or 1 expected) in wikipathways2ndex.R. Using first and deleting the rest."), stderr())
-				remainingNetworkIds <- tail(matchingNetworkIds, -1)
-				for (remainingNetworkId in remainingNetworkIds) {
-					ndex_network_set_systemProperties(ndexcon, remainingNetworkId, readOnly=FALSE)
-					ndex_delete_network(ndexcon, remainingNetworkId)
-				}
+				stop(paste0(
+				    "Error: ",
+				    matchingNetworkCount,
+				    " matching networks when just 0 or 1 expected in wikipathways2ndex.R."
+				    ))
 			}
+
 			networkId <- head(matchingNetworkIds, 1)
 
-			# if we get an error when trying to make editable, we ignore it and continue.
-			tryCatch({
-				ndex_network_set_systemProperties(ndexcon, networkId, readOnly=FALSE)
-			}, warning = function(w) {
-				write(paste("Warning making network editable in wikipathways2ndex.R:", w, sep = '\n'), stderr())
-				NA
-			}, error = function(err) {
-				write(paste("Error making network editable in wikipathways2ndex.R:", err, sep = '\n'), stderr())
-				NA
-			}, finally = {
-				# Do something
-			})
+			# make network editable
+			ndex_network_set_systemProperties(ndexcon, networkId, readOnly=FALSE)
 
-#			###################################################################
-#			# The code below is a kludge, because update isn't working properly
-#			###################################################################
-			print('Deleting...')
+			# NOTE: we need to something else in order to submit to the test/dev2 server.
+			# updateNetworkInNDEx only submits to production server.
+			# Using 1 == 2 to force this first section not to happen.
+			# Both updateNetworkInNDEx and cyrestPUT give an error about encoding.
+			if (1 == 2 && NDEX_HOST %in% RCY3_SUPPORTED_NDEX_HOSTS) {
+				print('updateNetworkInNDEx: start')
+#				exportResponse <- updateNetworkInNDEx(
+#					NDEX_USER,
+#					NDEX_PWD,
+#					isPublic=TRUE,
+#					metadata=metadata
+#					)
 
-			# if we get an error when trying to delete, we ignore it and continue.
-			tryCatch({
-				ndex_delete_network(ndexcon, networkId)
-			}, warning = function(w) {
-				write(paste("Warning when trying to update in wikipathways2ndex.R:", w, sep = '\n'), stderr())
-				NA
-			}, error = function(err) {
-				write(paste("Error when trying to update in wikipathways2ndex.R:", err, sep = '\n'), stderr())
-				NA
-			}, finally = {
-				# Do something
-			})
+				res <- cyrestPUT(paste('networks', suid, sep = '/'),
+					      body = list(serverUrl=NDEX_SERVER_URL,
+							  username=NDEX_USER,
+							  password=NDEX_PWD,
+							  metadata=metadata,
+							  isPublic=TRUE),
+						  base.url = "http://localhost:1234/cyndex2/v1")
+				result[["response"]] <- res$data$uuid
+				resErrors <- res$errors
+				if (length(resErrors) > 0) {
+					message <- paste(resErrors, sep = ' ')
+					result[["error"]] <- message
+					result[["success"]] <- FALSE
+				} else {
+					result[["error"]] <- NA
+					result[["success"]] <- TRUE
+				}
 
-			# TODO:: the code below is the same as what's in the "else"
-			# section further down in this file
-			print('Re-creating...')
-			res <- cyrestPOST(paste('networks', suid, sep = '/'),
-				      body = list(serverUrl=NDEX_SERVER_URL,
-						  username=NDEX_USER,
-						  password=NDEX_PWD,
-						  metadata=metadata,
-						  isPublic=TRUE),
-					  base.url = "http://localhost:1234/cyndex2/v1")
-			result[["response"]] <- res$data$uuid
-			resErrors <- res$errors
-			if (length(resErrors) > 0) {
-				message <- paste(resErrors, sep = ' ')
-				result[["error"]] <- message
-				result[["success"]] <- FALSE
+				print('updateNetworkInNDEx: done')
 			} else {
-				result[["error"]] <- NA
-				result[["success"]] <- TRUE
+
+				###################################################################
+				# The code below is a kludge, because update isn't working properly
+				###################################################################
+
+				print('Deleting...')
+				# if we get an error when trying to delete, we ignore it and continue.
+				tryCatch({
+					ndex_delete_network(ndexcon, networkId)
+				}, warning = function(w) {
+					write(paste("Warning when trying to update in wikipathways2ndex.R:", w, sep = '\n'), stderr())
+					NA
+				}, error = function(err) {
+					write(paste("Error when trying to update in wikipathways2ndex.R:", err, sep = '\n'), stderr())
+					NA
+				}, finally = {
+					# Do something
+				})
+
+				# TODO:: the code below is the same as what's in the "else"
+				# section further down in this file
+				print('Re-creating...')
+				res <- cyrestPOST(paste('networks', suid, sep = '/'),
+					      body = list(serverUrl=NDEX_SERVER_URL,
+							  username=NDEX_USER,
+							  password=NDEX_PWD,
+							  metadata=metadata,
+							  isPublic=TRUE),
+						  base.url = "http://localhost:1234/cyndex2/v1")
+				result[["response"]] <- res$data$uuid
+				resErrors <- res$errors
+				if (length(resErrors) > 0) {
+					message <- paste(resErrors, sep = ' ')
+					result[["error"]] <- message
+					result[["success"]] <- FALSE
+				} else {
+					result[["error"]] <- NA
+					result[["success"]] <- TRUE
+				}
 			}
 
 #			###################################################################
@@ -558,15 +651,15 @@ wikipathways2ndex <- function(CX_OUTPUT_DIR, wikipathwaysID) {
 
 #		# the code below is supposed to send a list of strings:
 #		# but it's returning a 500 error:
-#		rProperties <- PUT(
+#		propertiesResponse <- PUT(
 #			 paste(NDEX_SERVER_URL, 'network', networkId, 'properties', sep = '/'),
 #			 body = list(predicateString="mykey", dataType="string", value="myvalue"),
 #			 encode = "json",
 #			 authenticate(NDEX_USER, NDEX_PWD)
 #			 )
-#		print(rProperties)
-#		print(str(rProperties))
-#		stop_for_status(rProperties)
+#		print(propertiesResponse)
+#		print(str(propertiesResponse))
+#		stop_for_status(propertiesResponse)
 
 		# if we get an error when trying to make readOnly, we ignore it and continue.
 		tryCatch({

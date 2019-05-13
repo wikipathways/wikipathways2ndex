@@ -37,9 +37,9 @@ load_wikipathways_pathway <- function(wikipathwaysID) {
 		organism <- networkTableColumns[["organism"]]
 		description <- networkTableColumns[["description"]]
 		raw_pmids <- networkTableColumns[["pmids"]]
+
 		if (!is.blank(raw_pmids)) {
 			pathway_raw_pmids = paste(wikipathwaysID, raw_pmids, sep = ': ')
-			cat(pathway_raw_pmids, file=here("raw_pmids.txt"), append=TRUE, sep = "\n")
 			pmids <- as.integer(Filter(canBeInteger, unlist(strsplit(raw_pmids, "\\s*,\\s*"))))
 			if (!is.blank(pmids)) {
 				pmIRIs <- map(pmids, function(pmid) {
@@ -66,7 +66,11 @@ load_wikipathways_pathway <- function(wikipathwaysID) {
 			if (length(notpmids) > 0) {
 				pathway_text = paste(wikipathwaysID, paste(notpmids, collapse = ', '), sep = ': ')
 				cat(pathway_text, file=here("notpmids.txt"), append=TRUE, sep = "\n")
+			} else {
+				deleteTableColumn('pmids', table = 'network')
 			}
+		} else {
+			deleteTableColumn('pmids', table = 'network')
 		}
 
 
@@ -166,8 +170,16 @@ load_wikipathways_pathway <- function(wikipathwaysID) {
 
 		filepathCys <- paste0(filepath_san_ext, '.cys')
 
-		closeSession(TRUE, filename=filepath_san_ext)
-		openSession(file.location=filepathCys)
+		tryCatch({
+			closeSession(TRUE, filename=filepath_san_ext)
+			openSession(file.location=filepathCys)
+		}, warning = function(w) {
+			write(paste("Warning for close/re-open in wikipathways_extra.R:", w, sep = '\n'), stderr())
+		}, error = function(err) {
+			write(paste("Error for close/re-open in wikipathways_extra.R:", err, sep = '\n'), stderr())
+		}, finally = {
+			# Do something
+		})
 
 		tableColumnsPreCys <- getTableColumns()
 
@@ -186,6 +198,7 @@ load_wikipathways_pathway <- function(wikipathwaysID) {
 							       replace(is.null(.), CYTOSCAPE_NA) %>%
 							       replace(is.na(.), CYTOSCAPE_NA)
 						       )
+
 		loadTableData(as.data.frame(tableColumnsCorrected), table.key.column = 'SUID')
 
 #		# Some or all of these are actually Groups
