@@ -1,7 +1,7 @@
 with import <nixpkgs> { config.allowUnfree = true; };
 let
-  cytoscape371 = callPackage ./rcy3_nix/cytoscape.nix {}; 
-  RCy3_2312 = callPackage ./rcy3_nix/RCy3.nix {}; 
+  cytoscape371 = callPackage ./nix_rcy3/cytoscape.nix {}; 
+  RCy3_2312 = callPackage ./nix_rcy3/RCy3.nix {}; 
 in [
     # Add packages from nix-env -qaP | grep -i needle queries
     #dos2unix

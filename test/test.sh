@@ -10,8 +10,8 @@
 get_script_dir() { echo "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"; }
 SCRIPT_DIR=$(get_script_dir)
 
-(cd "$SCRIPT_DIR/../rcy3_nix/extras"; bash cytoscapestart.sh)
+(cd "$SCRIPT_DIR/../nix_rcy3/extras"; bash cytoscapestart.sh)
 
 Rscript "$SCRIPT_DIR/test.R"
 
-(cd "$SCRIPT_DIR/../rcy3_nix/extras"; bash cytoscapestop.sh)
+(cd "$SCRIPT_DIR/../nix_rcy3/extras"; bash cytoscapestop.sh)

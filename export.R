@@ -39,7 +39,7 @@ export_subset <- function(outdir_raw, exporterName, preprocessed, pathway_ids_ba
 		stop("valid exporter must be specified.n", call.=FALSE)
 	}
 
-	system(paste0("(cd ", here("rcy3_nix/extras"), "; bash cytoscapestart.sh)"))
+	system(paste0("(cd ", here("nix_rcy3/extras"), "; bash cytoscapestart.sh)"))
 	deleteAllNetworks()
 	results <- list()
 	tryCatch({
@@ -61,7 +61,7 @@ export_subset <- function(outdir_raw, exporterName, preprocessed, pathway_ids_ba
 		write(paste(paste0('Interrupted exporter ', exporterName, ', called by export_subset in export.R:'), i, sep = '\n'), stderr())
 	}, finally = {
 		deleteAllNetworks()
-		system(paste0("(cd ", here("rcy3_nix/extras"), "; bash cytoscapestop.sh)"))
+		system(paste0("(cd ", here("nix_rcy3/extras"), "; bash cytoscapestop.sh)"))
 	})
 	return(results)
 }
@@ -137,10 +137,10 @@ tryCatch({
 	write(paste('Warning in export.R:', w, sep = '\n'), stderr())
 }, error = function(e) {
 	write(paste('Error in export.R:', e, sep = '\n'), stderr())
-	system(paste0("(cd ", here("rcy3_nix/extras"), "; bash cytoscapestop.sh)"))
+	system(paste0("(cd ", here("nix_rcy3/extras"), "; bash cytoscapestop.sh)"))
 }, interrupt = function(i) {
 	write(paste('Interrupted export.R:', i, sep = '\n'), stderr())
-	system(paste0("(cd ", here("rcy3_nix/extras"), "; bash cytoscapestop.sh)"))
+	system(paste0("(cd ", here("nix_rcy3/extras"), "; bash cytoscapestop.sh)"))
 	#stop('Interrupted export.R')
 }, finally = {
 	# do something
