@@ -1,4 +1,4 @@
-{ stdenv, fetchurl, jre10, makeWrapper }:
+{ stdenv, fetchurl, jre8, makeWrapper }:
 
  # Pull request made: https://github.com/NixOS/nixpkgs/pull/56498
 
@@ -11,7 +11,7 @@ stdenv.mkDerivation rec {
     sha256 = "1mhsngbwbgdwl70wj7850zg94534lasihwv2ryifardm35mkh48k";
   };
 
-  buildInputs = [jre10 makeWrapper];
+  buildInputs = [jre8 makeWrapper];
 
   installPhase = ''
     mkdir -pv $out/{share,bin}
@@ -20,8 +20,8 @@ stdenv.mkDerivation rec {
     ln -s $out/share/cytoscape.sh $out/bin/cytoscape
 
     wrapProgram $out/share/cytoscape.sh \
-      --set JAVA_HOME "${jre10}" \
-      --set JAVA  "${jre10}/bin/java"
+      --set JAVA_HOME "${jre8}" \
+      --set JAVA  "${jre8}/bin/java"
 
     chmod +x $out/bin/cytoscape
   '';
