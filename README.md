@@ -59,7 +59,7 @@ screen -R
 
 ## Development
 
-Run tests: `./test/test.sh`
+Run tests: `./test/run.R`
 
 ## Further Details
 
