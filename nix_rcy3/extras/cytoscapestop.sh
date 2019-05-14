@@ -10,7 +10,11 @@
 get_script_dir() { echo "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"; }
 SCRIPT_DIR=$(get_script_dir)
 
-cytoscape_command_name='.xvfb-run-wrapped cytoscape'
+# NOTE: the first and second commands both work on Ubuntu, but
+# only the second works on Nix.
+#cytoscape_command_name='.xvfb-run-wrapped cytoscape'
+cytoscape_command_name='.xvfb-run-wrapp'
+
 tmux_session_name='wikipathways2ndex'
 
 if [[ $(ps -o pid= -C "$cytoscape_command_name" | wc -l) -gt 0 ]] && [[ $(tmux ls | grep $tmux_session_name) ]]; then
