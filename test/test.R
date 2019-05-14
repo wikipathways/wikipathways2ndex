@@ -8,6 +8,7 @@ library (igraph)
 CX_OUTPUT_DIR = tempdir()
 
 source(here('wikipathways2cx.R'))
+source(here('wikipathways2png.R'))
 
 #-------------------------------------------------------------------------------
 run.tests = function()
@@ -21,6 +22,7 @@ run.tests = function()
     deleteAllNetworks()     
 
     test.wikipathways2cx()
+    test.wikipathways2png()
     
     closeSession(FALSE)
     options('warn'=0)
@@ -67,12 +69,21 @@ test.wikipathways2cx = function ()
 {
     title = 'test.wikipathways2cx'
     test.prep(title,FALSE)
-    response <- wikipathways2cx(CX_OUTPUT_DIR, 'WP554')
+    response <- wikipathways2cx(CX_OUTPUT_DIR, list(), 'WP554')
+    checkEquals (response$error, NA)
+    checkTrue (response$success)
+    checkTrue (file.exists(file.path(CX_OUTPUT_DIR, 'WP554__ACE_Inhibitor_Pathway__Homo_sapiens.cx')))
+}
+
+#-------------------------------------------------------------------------------
+test.wikipathways2png = function ()
+{
+    title = 'test.wikipathways2png'
+    test.prep(title,FALSE)
+    response <- wikipathways2png(CX_OUTPUT_DIR, list(), 'WP554')
     checkEquals (response$error, NA)
     checkTrue (response$success)
     checkTrue (file.exists(file.path(CX_OUTPUT_DIR, 'WP554__ACE_Inhibitor_Pathway__Homo_sapiens.png')))
-    checkTrue (file.exists(file.path(CX_OUTPUT_DIR, 'WP554__ACE_Inhibitor_Pathway__Homo_sapiens.cx')))
-    
 }
 
 run.tests()

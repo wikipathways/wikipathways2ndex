@@ -169,7 +169,7 @@ wikipathways2ndexPreprocess <- function() {
 	return(list(networksInSet=networks))
 }
 
-wikipathways2ndex <- function(CX_OUTPUT_DIR, preprocessed, wikipathwaysID) {
+wikipathways2ndex <- function(OUTPUT_DIR, preprocessed, wikipathwaysID) {
 	networksInSet <- preprocessed$networksInSet
 
 	result <- list()
@@ -581,11 +581,7 @@ wikipathways2ndex <- function(CX_OUTPUT_DIR, preprocessed, wikipathwaysID) {
 ##			#    This method isn't working. It gives this message:
 ##			#    "This network is part of a Cytoscape collection and cannot be operated on or edited in NDEx."
 ##
-##			# replace any non-alphanumeric characters with underscore.
-##			# TODO: what about dashes? BTW, the following doesn't work:
-##			#filename <- paste0(gsub("[^[:alnum:\\-]]", "_", name))
-##			filename <- paste0(gsub("[^[:alnum:]]", "_", nameForNDEx))
-##			filepath_san_ext <- file.path(CX_OUTPUT_DIR, filename)
+##			filepath_san_ext <- getFilepathSanExt(OUTPUT_DIR, name)
 ##			exportNetwork(filename=filepath_san_ext, type='CX')
 ##			filepathCx <- paste0(filepath_san_ext, '.cx')
 ##			cx <- readLines(filepathCx, warn=FALSE)

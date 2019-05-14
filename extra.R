@@ -50,3 +50,50 @@ updateNetworkTable <- function(networkName, columnName, columnValue) {
 	# TODO: use SUID here as matching key 
 	loadTableData(updatedNetworkTableColumns, table = 'network')
 }
+
+getFilepathSanExt <- function(output_dir, name) {
+#	# replace any non-alphanumeric characters with underscore.
+#	# TODO: what about dashes? BTW, the following doesn't work:
+#	filename <- paste0(gsub("[^[:alnum:]]", "_", name))
+#	filepath_san_ext <- file.path(output_dir, filename)
+
+	# RCy3 turns a filepath like this:
+	#   ./WP4566__Translational_regulation_by_PDGFRÎ±__Homo_sapies
+	# into this:
+	#   ./WP4566__Translational_regulation_by_PDGFR?__Homo_sapies
+	# See https://github.com/cytoscape/RCy3/issues/54
+	# Notice that the character
+	#   'Î±'
+        # takes up two bytes, but the character
+	#   'a'
+	# takes up just one byte.
+	# RCy3 changes
+	#   'Î±'
+	# to
+	#   '±'
+	# so we pre-emptively try to do the same thing here.
+
+	# Note that there may be cases where we get a different result from
+	# RCy3, e.g., what would happen if there were two single-byte non-ASCII
+	# characters next to each other?
+
+	# Also, note that this character:
+	#sub_char_final <- '±'
+	# is not the same as this character:
+	sub_char_final <- '?'
+
+	sub_char_initial <- 'wp_sub_char'
+	filepath_san_ext_utf8 <- file.path(output_dir, name)
+	Encoding(filepath_san_ext_utf8) <- "UTF-8"
+	filepath_san_ext <- gsub(
+				 paste0('\\', sub_char_initial),
+				 sub_char_final,
+				 gsub(
+				      paste0('\\', sub_char_initial, '\\', sub_char_initial),
+				      sub_char_initial,
+				      iconv(filepath_san_ext_utf8, 'UTF-8', 'ASCII', sub = sub_char_initial)
+				      )
+				 )
+
+	return(filepath_san_ext)
+}

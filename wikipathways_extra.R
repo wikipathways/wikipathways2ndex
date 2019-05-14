@@ -29,6 +29,12 @@ load_wikipathways_pathway <- function(wikipathwaysID) {
 		# TODO: why does net.suid != suid, as gotten later on?
 		net.suid <- commandsGET(paste0('wikipathways import-as-pathway id="', wikipathwaysID, '"'))
 
+#		# This code gets username, but not the actual name of the user.
+#		# TODO: look at how to get citable name for each user
+#		pathwayHistory <- getPathwayHistory(wikipathwaysID, 19700101)
+#		print('pathwayHistory')
+#		print(pathwayHistory)
+
 		# FROM WIKIPATHWAYS APP
 		networkTableColumns <- getTableColumns(table = 'network', columns = 'name,title,organism,description,pmids')
 
@@ -124,10 +130,7 @@ load_wikipathways_pathway <- function(wikipathwaysID) {
 			updateNetworkTable(name, "description", description)
 		}
 
-		# replace any non-alphanumeric characters with underscore.
-		# TODO: what about dashes? BTW, the following doesn't work:
-		filename <- paste0(gsub("[^[:alnum:]]", "_", name))
-		filepath_san_ext <- file.path(tmp_dir, filename)
+		filepath_san_ext <- getFilepathSanExt(tmp_dir, name)
 
 		updateNetworkTable(name, "@context", CONTEXT)
 

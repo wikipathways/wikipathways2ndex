@@ -46,10 +46,10 @@ export_subset <- function(outdir_raw, exporterName, preprocessed, pathway_ids_ba
 		results <- tibble(pathway_id=pathway_ids_batch) %>%
 			mutate(returned=map(pathway_id, function(pathway_id) {exporter(outdir, preprocessed, pathway_id)})) %>%
 			mutate(name=map_chr(returned, "name")) %>%
-			mutate(response=map_chr(returned, "response")) %>%
+			mutate(file=map_chr(returned, "file")) %>%
 			mutate(success=map_lgl(returned, "success")) %>%
 			mutate(error=map_chr(returned, "error")) %>%
-			select(pathway_id, name, success, error, response)
+			select(pathway_id, name, success, error, file)
 	}, warning = function(w) {
 		write(paste(paste0('Warning in exporter ', exporterName, ', called by export_subset in export.R:'), w, sep = '\n'), stderr())
 	}, error = function(e) {
