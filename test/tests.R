@@ -85,5 +85,3 @@ test.wikipathways2png = function ()
     checkTrue (response$success)
     checkTrue (file.exists(file.path(CX_OUTPUT_DIR, 'WP554__ACE_Inhibitor_Pathway__Homo_sapiens.png')))
 }
-
-run.tests()
