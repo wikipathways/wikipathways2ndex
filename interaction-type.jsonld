@@ -13,6 +13,7 @@
     "Transcription": "http://identifiers.org/biomodels.sbo/SBO:0000183",
     "Translation": "http://identifiers.org/biomodels.sbo/SBO:0000184",
     "biochemical or transport reaction": "http://identifiers.org/biomodels.sbo/SBO:0000167",
-    "relationship": "http://identifiers.org/biomodels.sbo/SBO:0000374"
+    "relationship": "http://identifiers.org/biomodels.sbo/SBO:0000374",
+    "process": "http://identifiers.org/biomodels.sbo/SBO:0000375"
   }
 }

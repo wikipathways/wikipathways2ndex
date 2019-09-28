@@ -24,17 +24,16 @@ wikipathways2cx <- function(OUTPUT_DIR, preprocessed, wikipathwaysID) {
 	filepathCx <- paste0(filepath_san_ext, '.cx')
 
 	# save as cx
-	exportResponse <- exportNetwork(filename=filepath_san_ext, type='CX')
 	# TODO: right now, exportResponse only has one named item: 'file'.
 	# But it should also include the status info from the cx. 
-	# Then w could possibly just use exportResponse instead of making the
-	# 'result' list further below.
+	exportResponse <- exportNetwork(filename=filepath_san_ext, type='CX')
+
 	exportResponseFile <- exportResponse[["file"]]
 	if (exportResponseFile != filepathCx) {
 		write(paste('Warning in wikipathways2cx.R:', exportResponseFile, 'not the same as', filepathCx, sep = '\n'), stderr())
 	}
 
-	result <- list(file=filepathCx, name=networkName)
+	result <- list(output=filepathCx, name=networkName)
 
 	cx <- fromJSON(filepathCx)
 

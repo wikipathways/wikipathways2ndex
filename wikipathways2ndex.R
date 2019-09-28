@@ -226,30 +226,33 @@ wikipathways2ndex <- function(OUTPUT_DIR, preprocessed, wikipathwaysID) {
 
 			# if we get an error when trying to make node names use HGNC, we skip it and continue.
 			tryCatch({
-				# can't unify WP715, because it only has metabolites.
-				# Is Ensembl column missing?
+				# TODO: can we get rid of the check for the Ensembl column?
 				if (sourceColumnName %in% nodeTableColumnNames) {
-					mapTableColumn(sourceColumnName, organism, sourceColumnName, targetColumnName)
+					nodeTableColumns <- getTableColumns()
+					#if (!is.blank(nodeTableColumns$Ensembl)) {}
+					if (!is.blank(nodeTableColumns[sourceColumnName])) {
+						mapTableColumn(sourceColumnName, organism, sourceColumnName, targetColumnName)
 
-					hgncified <- as_tibble(getTableColumns()) %>%
-						mutate("__gpml:textlabel"=name) %>%
-						mutate(name=ifelse(is.na(HGNC), name, HGNC))
+						hgncified <- as_tibble(getTableColumns()) %>%
+							mutate("__gpml:textlabel"=name) %>%
+							mutate(name=ifelse(is.na(HGNC), name, HGNC))
 
-					## TODO: why do neither of the two lines below correctly update the name column?
-					## For example, try converting WP554 and verify that prostacyclin is now named GALNT13.
-					## But further update: that's wrong. prostacyclin is a metabolite.
-					#loadTableData(as.data.frame(hgncified))
-					#loadTableData(as.data.frame(hgncified), table.key.column = 'SUID')
+						## TODO: why do neither of the two lines below correctly update the name column?
+						## For example, try converting WP554 and verify that prostacyclin is now named GALNT13.
+						## But further update: that's wrong. prostacyclin is a metabolite.
+						#loadTableData(as.data.frame(hgncified))
+						#loadTableData(as.data.frame(hgncified), table.key.column = 'SUID')
 
-					## Maybe I need it's something about tidyr not using row names?
-					## We could take a look at using something like this:
-					## column_to_rownames(hgncified_df, var = "SUID")
+						## Maybe I need it's something about tidyr not using row names?
+						## We could take a look at using something like this:
+						## column_to_rownames(hgncified_df, var = "SUID")
 
-					# The following code does work, but couldn't it be simplified?
-					hgncified_df <- as.data.frame(hgncified)
-					row.names(hgncified_df) <- hgncified_df[["SUID"]]
-					loadTableData(hgncified_df, table.key.column = 'SUID')
-					nodeTableColumnNames <- getTableColumnNames()
+						# The following code does work, but couldn't it be simplified?
+						hgncified_df <- as.data.frame(hgncified)
+						row.names(hgncified_df) <- hgncified_df[["SUID"]]
+						loadTableData(hgncified_df, table.key.column = 'SUID')
+						nodeTableColumnNames <- getTableColumnNames()
+					}
 				}
 			}, warning = function(w) {
 				write(paste("Warning using HGNC for node names in wikipathways2ndex.R:", w, sep = '\n'), stderr())
@@ -266,10 +269,24 @@ wikipathways2ndex <- function(OUTPUT_DIR, preprocessed, wikipathwaysID) {
 			tryCatch({
 				edgeTable <- as_tibble(getTableColumns(table = 'edge')) %>%
 					mutate(start_normalized=map_chr(StartArrow, function(StartArrow) {
-						return(VALUE_MAPPINGS[[StartArrow]])
+						normalized <- ''
+						if (hasName(VALUE_MAPPINGS, StartArrow)) {
+							normalized <- VALUE_MAPPINGS[[StartArrow]]
+						} else {
+							write(paste("Warning: no normalized for StartArrow ", StartArrow, " in wikipathways2ndex.R:", w, sep = '\n'), stderr())
+							normalized <- 'none'
+						}
+						return(normalized)
 					})) %>%
 					mutate(end_normalized=map_chr(EndArrow, function(EndArrow) {
-						return(VALUE_MAPPINGS[[EndArrow]])
+						normalized <- ''
+						if (hasName(VALUE_MAPPINGS, EndArrow)) {
+							normalized <- VALUE_MAPPINGS[[EndArrow]]
+						} else {
+							write(paste("Warning: no normalized for EndArrow ", EndArrow, " in wikipathways2ndex.R:", w, sep = '\n'), stderr())
+							normalized <- 'none'
+						}
+						return(normalized)
 					})) %>%
 					mutate(normalized=ifelse(end_normalized != 'none', end_normalized, start_normalized)) %>%
 					mutate(sboType=map_chr(normalized, function(normalized) {
@@ -314,9 +331,7 @@ wikipathways2ndex <- function(OUTPUT_DIR, preprocessed, wikipathwaysID) {
 									    text = wikipathwaysType)
 							wikipathwaysTypeLinks <- c(wikipathwaysTypeLink)
 						}
-						#return(paste(sboTypeLinks, biopaxType, wikipathwaysTypeLinks, collapse = ', ', sep = ', '))
 						return(paste0(purrr::flatten(list(sboTypeLinks, wikipathwaysTypeLinks, biopaxTypes)), collapse = ', '))
-						#return(paste0(sboTypeLinks, biopaxType, collapse = ', '))
 					})) %>%
 					select(sboType, type, SUID)
 
@@ -483,7 +498,7 @@ wikipathways2ndex <- function(OUTPUT_DIR, preprocessed, wikipathwaysID) {
 							  metadata=metadata,
 							  isPublic=TRUE),
 						  base.url = "http://localhost:1234/cyndex2/v1")
-				result[["response"]] <- res$data$uuid
+				result[["output"]] <- res$data$uuid
 				resErrors <- res$errors
 				if (length(resErrors) > 0) {
 					message <- paste(resErrors, sep = ' ')
@@ -525,7 +540,7 @@ wikipathways2ndex <- function(OUTPUT_DIR, preprocessed, wikipathwaysID) {
 							  metadata=metadata,
 							  isPublic=TRUE),
 						  base.url = "http://localhost:1234/cyndex2/v1")
-				result[["response"]] <- res$data$uuid
+				result[["output"]] <- res$data$uuid
 				resErrors <- res$errors
 				if (length(resErrors) > 0) {
 					message <- paste(resErrors, sep = ' ')
@@ -611,7 +626,7 @@ wikipathways2ndex <- function(OUTPUT_DIR, preprocessed, wikipathwaysID) {
 #
 #			result[["error"]] <- NA
 #			result[["success"]] <- TRUE
-#			result[["response"]] <- networkId
+#			result[["output"]] <- networkId
 		} else {
 			# NOTE: we need to use cyrestPOST in order to submit to the test/dev2 server.
 			# exportNetworkToNDEx only submits to production server.
@@ -623,7 +638,7 @@ wikipathways2ndex <- function(OUTPUT_DIR, preprocessed, wikipathwaysID) {
 						  metadata=metadata,
 						  isPublic=TRUE),
 					  base.url = "http://localhost:1234/cyndex2/v1")
-			result[["response"]] <- res$data$uuid
+			result[["output"]] <- res$data$uuid
 			resErrors <- res$errors
 			if (length(resErrors) > 0) {
 				message <- paste(resErrors, sep = ' ')
@@ -635,7 +650,7 @@ wikipathways2ndex <- function(OUTPUT_DIR, preprocessed, wikipathwaysID) {
 			}
 		}
 
-		networkId <- result[["response"]]
+		networkId <- result[["output"]]
 
 		r <- POST(
 			  paste(NDEX_SERVER_URL, 'networkset', NETWORKSET_ID, 'members', sep = '/'),
