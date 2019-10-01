@@ -3,3 +3,5 @@
 WikiPathways-v3.3.7-*.jar
 show_fails
 pathway_ids.tsv
+pfocr2ndex/images_clean/
+pfocr2ndex/images/
