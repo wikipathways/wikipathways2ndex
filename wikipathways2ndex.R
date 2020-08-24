@@ -6,6 +6,12 @@ library(here)
 library(httr)
 library(ndexr)
 
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+if (!requireNamespace("rWikiPathways", quietly = TRUE))
+  BiocManager::install("rWikiPathways")
+
+
 library(RCy3)
 library(jsonlite)
 library(rWikiPathways)
@@ -37,6 +43,19 @@ NDEX_USER_UUID <- Sys.getenv("NDEX_USER_UUID")
 NDEX_USER <- Sys.getenv("NDEX_USER")
 NDEX_PWD <- Sys.getenv("NDEX_PWD")
 
+if (NDEX_USER == '' || NDEX_PWD == '') {
+  NDEX_USER <- readline('Enter your NDEx username: ')
+  NDEX_PWD <- readline('Enter your NDEx password: ')
+  if (NDEX_USER == '' || NDEX_PWD == '') {
+    message <- 'Error: environment variables NDEX_USER and/or NDEX_PWD not set.'
+    write(message, stderr())
+    write('In your terminal, run:', stderr())
+    write('export NDEX_USER=\'your-ndex-username\'', stderr())
+    write('export NDEX_PWD=\'your-ndex-password\'', stderr())
+    stop(message)
+  }
+}
+
 NDEX_HOST=""
 NETWORKSET_ID <- ''
 if (NDEX_USER == 'wikipathways') {
@@ -66,17 +85,7 @@ NDEX_SERVER_URL=paste0("http://", NDEX_HOST, "/v2")
 
 RCY3_SUPPORTED_NDEX_HOSTS <- c("ndexbio.org")
 
-ndexcon <- NA
-if (NDEX_USER == '' || NDEX_PWD == '') {
-	message <- 'Error: environment variables NDEX_USER and/or NDEX_PWD not set.'
-	write(message, stderr())
-	write('In your terminal, run:', stderr())
-	write('export NDEX_USER=\'your-ndex-username\'', stderr())
-	write('export NDEX_PWD=\'your-ndex-password\'', stderr())
-	stop(message)
-} else {
-	ndexcon <- ndex_connect(username=NDEX_USER, password=NDEX_PWD, host=NDEX_HOST, ndexConf=ndex_config$Version_2.0)
-}
+ndexcon <- ndex_connect(username=NDEX_USER, password=NDEX_PWD, host=NDEX_HOST, ndexConf=ndex_config$Version_2.0)
 
 # TODO: should we set the following?
 #options(encoding = "UTF-8")
