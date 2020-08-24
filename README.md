@@ -57,6 +57,14 @@ screen -R
 # K
 ```
 
+### Alternative
+
+If everything is installed but you don't want to use Nix, try this, but note it hasn't been fully tested:
+
+1. Disable the lines like `system(paste0("(cd ", here("nix_rcy3/extras"), "; bash cytoscapestart.sh)"))` in export.R
+2. Open Cytoscape
+3. Execute: `./export.R Rscript AnalysisCollection ndex ./output-dir`
+
 ## Development
 
 Run tests: `./test/run.R`
