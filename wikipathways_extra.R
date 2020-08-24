@@ -184,25 +184,26 @@ load_wikipathways_pathway <- function(wikipathwaysID) {
 			# Do something
 		})
 
-		tableColumnsPreCys <- getTableColumns()
-
-		i <- sapply(tableColumnsPreCys, is.factor)
-		tableColumnsPreCys[i] <- lapply(tableColumnsPreCys[i], as.character)
-
-		CYTOSCAPE_NA<-""
-		tableColumnsCorrected <- as.data.frame(
-						       as_tibble(tableColumnsPreCys) %>%
-							       replace(.=="NULL", CYTOSCAPE_NA) %>%
-							       replace(.=="null", CYTOSCAPE_NA) %>%
-							       replace(.=="", CYTOSCAPE_NA) %>%
-							       replace(.=="NA", CYTOSCAPE_NA) %>%
-							       replace(.=="<NA>", CYTOSCAPE_NA) %>%
-							       replace(.==NA, CYTOSCAPE_NA) %>%
-							       replace(is.null(.), CYTOSCAPE_NA) %>%
-							       replace(is.na(.), CYTOSCAPE_NA)
-						       )
-
-		loadTableData(as.data.frame(tableColumnsCorrected), table.key.column = 'SUID')
+		# Commenting out this section was needed to avoid error re: isgpmlshape.
+		# tableColumnsPreCys <- getTableColumns()
+		# 
+		# i <- sapply(tableColumnsPreCys, is.factor)
+		# tableColumnsPreCys[i] <- lapply(tableColumnsPreCys[i], as.character)
+		# 
+		# CYTOSCAPE_NA<-""
+		# tableColumnsCorrected <- as.data.frame(
+		# 				       as_tibble(tableColumnsPreCys) %>%
+		# 					       replace(.=="NULL", CYTOSCAPE_NA) %>%
+		# 					       replace(.=="null", CYTOSCAPE_NA) %>%
+		# 					       replace(.=="", CYTOSCAPE_NA) %>%
+		# 					       replace(.=="NA", CYTOSCAPE_NA) %>%
+		# 					       replace(.=="<NA>", CYTOSCAPE_NA) %>%
+		# 					       replace(.==NA, CYTOSCAPE_NA) %>%
+		# 					       replace(is.null(.), CYTOSCAPE_NA) %>%
+		# 					       replace(is.na(.), CYTOSCAPE_NA)
+		# 				       )
+		# 
+		# loadTableData(as.data.frame(tableColumnsCorrected), table.key.column = 'SUID')
 
 #		# Some or all of these are actually Groups
 #		emptyNodes <- as_tibble(tableColumnsPreCys) %>%
