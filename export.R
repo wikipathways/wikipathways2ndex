@@ -23,6 +23,11 @@ if (INTERACTIVE && (Sys.getenv("NDEX_USER") == "" || is.null(Sys.getenv("NDEX_US
   NDEX_PWD <- rstudioapi::askForPassword("Enter your NDEx password")
 }
 
+if (INTERACTIVE) {
+  # clear the console
+  rstudioapi::sendToConsole("\014") 
+}
+
 print("NDEX_USER:")
 print(NDEX_USER)
 
@@ -141,7 +146,6 @@ my_option_list = list(
   )
 )
 
-
 parser <-
   OptionParser(
     usage = paste0("%prog [options] input exporter outdir"),
@@ -237,17 +241,15 @@ tryCatch({
     pathway_ids <- tail(pathway_ids, options$tail)
   }
   
-  print("pathway_ids: boo")
-  print(pathway_ids)
-  
+  print(paste0("processing ", length(pathway_ids), " pathway_ids"))
+
   preprocessor <- exportersByName[exporterName][[1]]$preprocessor
   preprocessed <- preprocessor()
   
   # TODO: look at wikipathways2ndex regarding grouping by organism
   for (pathway_ids_batch in split(pathway_ids, ceiling(seq_along(pathway_ids) /
                                                        BATCH_SIZE))) {
-    print('pathway_ids_batch')
-    print(pathway_ids_batch)
+    print(paste0('Current batch: ', pathway_ids_batch))
     results <-
       export_subset(outdir_raw, exporterName, preprocessed, pathway_ids_batch)
     print(as.data.frame(results))

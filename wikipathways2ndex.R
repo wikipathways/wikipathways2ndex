@@ -74,11 +74,8 @@ if (NDEX_USER == 'wikipathways') {
 	# for the set named 'testing' on the test server
 	#NETWORKSET_ID <- '7dbe0e40-5c05-11e9-831d-0660b7976219'
 
-	# for the set named 'wikipathways-gpml-Homo_sapiens' on the test server
+	# for the set named 'WikiPathways Collection - Homo sapiens' on the test server
 	NETWORKSET_ID <- 'b44b7ca7-4da1-11e9-9fc6-0660b7976219'
-
-	# for the set named 'wikipathways-20190412-gpml-Homo_sapiens' on the test server
-#	NETWORKSET_ID <- '6ecc6399-5d56-11e9-831d-0660b7976219'
 }
 
 NDEX_SERVER_URL=paste0("http://", NDEX_HOST, "/v2")
@@ -98,8 +95,6 @@ makeHtmlLink <- function(IRI, text = '') {
 	return(htmlLink)
 }
 
-networks<-NA
-
 # returns a list of network ids
 getNetworksInSet <- function() {
 	networks <- list()
@@ -112,7 +107,7 @@ getNetworksInSet <- function() {
 		stop_for_status(networks_r)
 		networksInSet <- content(networks_r)$networks
 
-		networks <- as_tibble(list(networkIdInSet=networksInSet)) %>% head(100) %>%
+		networks <- as_tibble(list(networkIdInSet=networksInSet)) %>%
 			mutate(data=map(networkIdInSet, function(networkIdInSet) {
 				returned <- tryCatch({
 					res <- ndex_network_get_summary(ndexcon, networkIdInSet)
@@ -121,6 +116,11 @@ getNetworksInSet <- function() {
 					properties <- res$properties
 					wikipathwaysIDRow <- properties[properties$predicateString == "wikipathwaysID" , ]
 					wikipathwaysID <- wikipathwaysIDRow$value
+					
+					if (wikipathwaysID == "") {
+					  print(paste("Missing wikipathwaysID for network ", externalId))
+					}
+					
 					list(externalId=externalId, wikipathwaysID=wikipathwaysID, isDeleted=isDeleted)
 				}, warning = function(w) {
 					write(paste("Warning getting network summary in wikipathways2ndex.R:", w, sep = '\n'), stderr())
@@ -181,7 +181,7 @@ wikipathways2ndexPreprocess <- function() {
 
 wikipathways2ndex <- function(OUTPUT_DIR, preprocessed, wikipathwaysID) {
 	networksInSet <- preprocessed$networksInSet
-
+	
 	result <- list()
 	tryCatch({
 		print(paste('Processing wikipathwaysID:', wikipathwaysID, '...'))

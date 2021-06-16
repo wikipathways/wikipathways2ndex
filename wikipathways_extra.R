@@ -231,4 +231,3 @@ load_wikipathways_pathway <- function(wikipathwaysID) {
 
 	return(result)
 }
-
