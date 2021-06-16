@@ -98,6 +98,8 @@ makeHtmlLink <- function(IRI, text = '') {
 	return(htmlLink)
 }
 
+networks<-NA
+
 # returns a list of network ids
 getNetworksInSet <- function() {
 	networks <- list()
@@ -110,7 +112,7 @@ getNetworksInSet <- function() {
 		stop_for_status(networks_r)
 		networksInSet <- content(networks_r)$networks
 
-		networks <- as_tibble(list(networkIdInSet=networksInSet)) %>%
+		networks <- as_tibble(list(networkIdInSet=networksInSet)) %>% head(100) %>%
 			mutate(data=map(networkIdInSet, function(networkIdInSet) {
 				returned <- tryCatch({
 					res <- ndex_network_get_summary(ndexcon, networkIdInSet)
@@ -131,12 +133,11 @@ getNetworksInSet <- function() {
 				}, finally = {
 					# Do something
 				})
-
 				return(returned)
 			})) %>%
-			mutate(externalId=map_chr(data, "externalId")) %>%
-			mutate(wikipathwaysID=map_chr(data, "wikipathwaysID")) %>%
-			mutate(isDeleted=map_lgl(data, "isDeleted"))
+			  mutate(externalId=map_chr(data, "externalId")) %>%
+			  mutate(wikipathwaysID=map_chr(data, "wikipathwaysID")) %>%
+			  mutate(isDeleted=map_lgl(data, "isDeleted"))
 
 	}, warning = function(w) {
 		write(paste("Warning in getNetworksInSet in wikipathways2ndex.R:", w, sep = '\n'), stderr())
@@ -491,7 +492,7 @@ wikipathways2ndex <- function(OUTPUT_DIR, preprocessed, wikipathwaysID) {
 			# updateNetworkInNDEx only submits to production server.
 			# Using 1 == 2 to force this first section not to happen.
 			# Both updateNetworkInNDEx and cyrestPUT give an error about encoding.
-			if (1 == 2 && NDEX_HOST %in% RCY3_SUPPORTED_NDEX_HOSTS) {
+			if (NDEX_HOST %in% RCY3_SUPPORTED_NDEX_HOSTS) {
 				print('updateNetworkInNDEx: start')
 #				exportResponse <- updateNetworkInNDEx(
 #					NDEX_USER,

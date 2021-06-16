@@ -102,7 +102,7 @@ load_wikipathways_pathway <- function(wikipathwaysID) {
 		if (is.blank(description)) {
 			#write("Warning: description not found by cytoscape app in wikipathways_extra.R", stderr())
 			pathway_latin1 <- getPathway(wikipathwaysID)
-			Encoding(pathway_latin1) <- "latin1"
+			#Encoding(pathway_latin1) <- "latin1"
 			pathway <- as_utf8(pathway_latin1)
 
 			# if we get an error when trying to get description, we skip it and continue.
@@ -231,3 +231,4 @@ load_wikipathways_pathway <- function(wikipathwaysID) {
 
 	return(result)
 }
+
