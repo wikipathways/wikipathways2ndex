@@ -28,8 +28,7 @@ if (INTERACTIVE) {
   rstudioapi::sendToConsole("\014") 
 }
 
-print("NDEX_USER:")
-print(NDEX_USER)
+print(paste0("NDEX_USER: ", NDEX_USER))
 
 Sys.setenv("NDEX_USER" = NDEX_USER)
 Sys.setenv("NDEX_PWD" = NDEX_PWD)

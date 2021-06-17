@@ -69,7 +69,7 @@ if (NDEX_USER == 'wikipathways') {
 	NETWORKSET_ID <- '453c1c63-5c10-11e9-9f06-0ac135e8bacf'
 } else {
 	# for testing
-	NDEX_HOST="dev2.ndexbio.org"
+	NDEX_HOST="test.ndexbio.org"
 
 	# for the set named 'testing' on the test server
 	#NETWORKSET_ID <- '7dbe0e40-5c05-11e9-831d-0660b7976219'
@@ -80,7 +80,7 @@ if (NDEX_USER == 'wikipathways') {
 
 NDEX_SERVER_URL=paste0("http://", NDEX_HOST, "/v2")
 
-RCY3_SUPPORTED_NDEX_HOSTS <- c("ndexbio.org")
+RCY3_SUPPORTED_NDEX_HOSTS <- c("ndexbio.org", "test.ndexbio.org")
 
 ndexcon <- ndex_connect(username=NDEX_USER, password=NDEX_PWD, host=NDEX_HOST, ndexConf=ndex_config$Version_2.0)
 
@@ -96,11 +96,11 @@ makeHtmlLink <- function(IRI, text = '') {
 }
 
 # returns a list of network ids
-getNetworksInSet <- function() {
+getNetworksInSet <- function(networksetId) {
 	networks <- list()
 	tryCatch({
 		networks_r <- GET(
-			 paste(NDEX_SERVER_URL, 'networkset', NETWORKSET_ID, sep = '/'),
+			 paste(NDEX_SERVER_URL, 'networkset', networksetId, sep = '/'),
 			 accept_json(),
 			 authenticate(NDEX_USER, NDEX_PWD)
 			 )
@@ -153,29 +153,15 @@ getNetworksInSet <- function() {
 	return(networks)
 }
 
-prepareNetworkSet <- function() {
+prepareNetworkSet <- function(networksetId) {
 	print('Preparing network set...')
 
-	networks <- getNetworksInSet()
-	networkdIds <- as.list(networks$externalId)
-
-	# remove all networks from current set.
-	# we'll put them back later.
-	if (length(networks) > 0) {
-		r <- DELETE(
-			  paste(NDEX_SERVER_URL, 'networkset', NETWORKSET_ID, 'members', sep = '/'),
-			  body = networkdIds,
-			  encode = "json",
-			  authenticate(NDEX_USER, NDEX_PWD)
-			  )
-		stop_for_status(r)
-	}
-
+	networks <- getNetworksInSet(networksetId)
 	return(networks)
 }
 
 wikipathways2ndexPreprocess <- function() {
-	networks <- prepareNetworkSet()
+	networks <- prepareNetworkSet(NETWORKSET_ID)
 	return(list(networksInSet=networks))
 }
 
@@ -488,18 +474,12 @@ wikipathways2ndex <- function(OUTPUT_DIR, preprocessed, wikipathwaysID) {
 			# make network editable
 			ndex_network_set_systemProperties(ndexcon, networkId, readOnly=FALSE)
 
-			# NOTE: we need to something else in order to submit to the test/dev2 server.
+			# NOTE: we need to something else in order to submit to the test server.
 			# updateNetworkInNDEx only submits to production server.
-			# Using 1 == 2 to force this first section not to happen.
-			# Both updateNetworkInNDEx and cyrestPUT give an error about encoding.
+			# cyrestPUT give this error:
+			#   Unable to update network in NDEx. UUID unknown. Can't find current Network in NDEx. Try saving as a new network.
 			if (NDEX_HOST %in% RCY3_SUPPORTED_NDEX_HOSTS) {
 				print('updateNetworkInNDEx: start')
-#				exportResponse <- updateNetworkInNDEx(
-#					NDEX_USER,
-#					NDEX_PWD,
-#					isPublic=TRUE,
-#					metadata=metadata
-#					)
 
 				res <- cyrestPUT(paste('networks', suid, sep = '/'),
 					      body = list(serverUrl=NDEX_SERVER_URL,
@@ -508,6 +488,7 @@ wikipathways2ndex <- function(OUTPUT_DIR, preprocessed, wikipathwaysID) {
 							  metadata=metadata,
 							  isPublic=TRUE),
 						  base.url = "http://localhost:1234/cyndex2/v1")
+				
 				result[["output"]] <- res$data$uuid
 				resErrors <- res$errors
 				if (length(resErrors) > 0) {
