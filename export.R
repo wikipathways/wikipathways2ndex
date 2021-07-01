@@ -50,7 +50,7 @@ exportersByName <- list(
   "ndex" = list(preprocessor = wikipathways2ndexPreprocess,
                 exporter = wikipathways2ndex)
 )
-
+    
 export_subset <-
   function(outdir_raw,
            exporterName,

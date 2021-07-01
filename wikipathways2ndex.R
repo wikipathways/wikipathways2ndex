@@ -117,7 +117,8 @@ getNetworksInSet <- function(networksetId) {
 					wikipathwaysIDRow <- properties[properties$predicateString == "wikipathwaysID" , ]
 					wikipathwaysID <- wikipathwaysIDRow$value
 					
-					if (wikipathwaysID == "") {
+					# wikipathwaysID can be logical(0)
+					if (length(wikipathwaysID) == 0 || wikipathwaysID == "") {
 					  print(paste("Missing wikipathwaysID for network ", externalId))
 					}
 					
@@ -173,6 +174,14 @@ wikipathways2ndex <- function(OUTPUT_DIR, preprocessed, wikipathwaysID) {
 		print(paste('Processing wikipathwaysID:', wikipathwaysID, '...'))
 		result <- load_wikipathways_pathway(wikipathwaysID)
 
+		if (!(NDEX_HOST %in% RCY3_SUPPORTED_NDEX_HOSTS)) {
+		  stop(paste0(
+		    "Error: ",
+		    NDEX_HOST,
+		    " not in RCY3_SUPPORTED_NDEX_HOSTS."
+		  ))
+		}		
+		
 		networkTableColumnNames <- getTableColumnNames(table = 'network')
 		networkTableColumns <- getTableColumns(table = 'network', columns = 'wikipathwaysIRI,name,title,organism,description')
 
@@ -350,7 +359,6 @@ wikipathways2ndex <- function(OUTPUT_DIR, preprocessed, wikipathwaysID) {
 			})
 		}
 
-
 		# TODO: should we reference DataNodes of type Pathway with WithPathways IDs as NDEx subnetworks?
 
 		metadata <- list(labels=c(wikipathwaysID))
@@ -470,158 +478,52 @@ wikipathways2ndex <- function(OUTPUT_DIR, preprocessed, wikipathwaysID) {
 			}
 
 			networkId <- head(matchingNetworkIds, 1)
-
+			
+			print(paste0('Pathway ', wikipathwaysID, ' found in NDEx as network ', networkId, '. Updating...'))
+			
 			# make network editable
 			ndex_network_set_systemProperties(ndexcon, networkId, readOnly=FALSE)
-
-			# NOTE: we need to something else in order to submit to the test server.
-			# updateNetworkInNDEx only submits to production server.
-			# cyrestPUT give this error:
-			#   Unable to update network in NDEx. UUID unknown. Can't find current Network in NDEx. Try saving as a new network.
-			if (NDEX_HOST %in% RCY3_SUPPORTED_NDEX_HOSTS) {
-				print('updateNetworkInNDEx: start')
-
-				res <- cyrestPUT(paste('networks', suid, sep = '/'),
-					      body = list(serverUrl=NDEX_SERVER_URL,
-							  username=NDEX_USER,
-							  password=NDEX_PWD,
-							  metadata=metadata,
-							  isPublic=TRUE),
-						  base.url = "http://localhost:1234/cyndex2/v1")
-				
-				result[["output"]] <- res$data$uuid
-				resErrors <- res$errors
-				if (length(resErrors) > 0) {
-					message <- paste(resErrors, sep = ' ')
-					result[["error"]] <- message
-					result[["success"]] <- FALSE
-				} else {
-					result[["error"]] <- NA
-					result[["success"]] <- TRUE
-				}
-
-				print('updateNetworkInNDEx: done')
+			
+			print(paste0('Pathway ', wikipathwaysID, ' not found in NDEx. Posting as new network.'))
+			
+			# associate the pathway we downloaded from WikiPathways
+			# with the UUID on NDEx
+			res <- cyrestPUT(paste('networks', suid, 'NDEXUUID', sep = '/'),
+        body = list(serverUrl=NDEX_SERVER_URL,
+                    username=NDEX_USER,
+                    password=NDEX_PWD,
+                    uuid=networkId),
+        base.url = "http://localhost:1234/cyndex2/v1")
+			
+			# TODO: add some error handling to catch the case where the previous
+			# call fails. This could be due to being logged into the wrong NDEx
+			# or not logged in at all in Cytoscape.
+			
+			# TODO: figure out how to programmatically log into the desired
+			# NDEx profile in the NDEx app for Cytoscape.
+	
+			res <- cyrestPUT(paste('networks', suid, sep = '/'),
+				      body = list(serverUrl=NDEX_SERVER_URL,
+						  username=NDEX_USER,
+						  password=NDEX_PWD,
+						  metadata=metadata,
+						  isPublic=TRUE),
+					  base.url = "http://localhost:1234/cyndex2/v1")
+			
+			result[["output"]] <- res$data$uuid
+			resErrors <- res$errors
+			if (length(resErrors) > 0) {
+				message <- paste(resErrors, sep = ' ')
+				result[["error"]] <- message
+				result[["success"]] <- FALSE
 			} else {
-
-				###################################################################
-				# The code below is a kludge, because update isn't working properly
-				###################################################################
-
-				print('Deleting...')
-				# if we get an error when trying to delete, we ignore it and continue.
-				tryCatch({
-					ndex_delete_network(ndexcon, networkId)
-				}, warning = function(w) {
-					write(paste("Warning when trying to update in wikipathways2ndex.R:", w, sep = '\n'), stderr())
-					NA
-				}, error = function(err) {
-					write(paste("Error when trying to update in wikipathways2ndex.R:", err, sep = '\n'), stderr())
-					NA
-				}, finally = {
-					# Do something
-				})
-
-				# TODO:: the code below is the same as what's in the "else"
-				# section further down in this file
-				print('Re-creating...')
-				res <- cyrestPOST(paste('networks', suid, sep = '/'),
-					      body = list(serverUrl=NDEX_SERVER_URL,
-							  username=NDEX_USER,
-							  password=NDEX_PWD,
-							  metadata=metadata,
-							  isPublic=TRUE),
-						  base.url = "http://localhost:1234/cyndex2/v1")
-				result[["output"]] <- res$data$uuid
-				resErrors <- res$errors
-				if (length(resErrors) > 0) {
-					message <- paste(resErrors, sep = ' ')
-					result[["error"]] <- message
-					result[["success"]] <- FALSE
-				} else {
-					result[["error"]] <- NA
-					result[["success"]] <- TRUE
-				}
+				result[["error"]] <- NA
+				result[["success"]] <- TRUE
 			}
-
-#			###################################################################
-#			# None of the methods below work properly.
-#			# 1. cyrestPUT gives an error about encoding
-#			# 2. produces a network that never displays
-#			# 3. produces a  Cytoscape collection instead of an NDEx network
-#			###################################################################
-#
-#			# 1. Update using existing libraries
-#
-#			#exportResponse <- updateNetworkInNDEx(NDEX_USER, NDEX_PWD, isPublic=TRUE)
-#			# NOTE: we need to something else in order to submit to the test/dev2 server.
-#			# updateNetworkInNDEx only submits to production server.
-#
-#			res <- cyrestPUT(paste('networks', suid, sep = '/'),
-#				      body = list(serverUrl=NDEX_SERVER_URL,
-#						  username=NDEX_USER,
-#						  password=NDEX_PWD,
-#						  metadata=metadata,
-#						  isPublic=TRUE),
-#					  base.url = "http://localhost:1234/cyndex2/v1")
-#
-#			# get cx and convert to rcx
-#			# 2. Try getting it by posting to NDEx and downloading
-#			res <- cyrestPOST(paste('networks', suid, sep = '/'),
-#				      body = list(serverUrl=NDEX_SERVER_URL,
-#						  username=NDEX_USER,
-#						  password=NDEX_PWD,
-#						  metadata=metadata,
-#						  isPublic=TRUE),
-#				      base.url = "http://localhost:1234/cyndex2/v1")
-#			networkIdUpdatePlaceholder <- res$data$uuid
-#			rcx <- ndex_get_network(ndexcon, networkIdUpdatePlaceholder)
-#			# We don't need it any more
-#			ndex_delete_network(ndexcon, networkIdUpdatePlaceholder)
-#			rcx$networkAttributes$d[is.na(rcx$networkAttributes$d)] <- "string"
-#			rcx$nodeAttributes$d[is.na(rcx$nodeAttributes$d)] <- "string"
-#			rcx$edgeAttributes$d[is.na(rcx$edgeAttributes$d)] <- "string"
-#			rcx$cyVisualProperties$applies_to[is.na(rcx$cyVisualProperties$applies_to)] <- 0
-#			rcx <- rcx_updateMetaData(rcx)
-#
-##			# 3. Try getting it by exporting as CX and opening
-##			#    This method isn't working. It gives this message:
-##			#    "This network is part of a Cytoscape collection and cannot be operated on or edited in NDEx."
-##
-##			filepath_san_ext <- getFilepathSanExt(OUTPUT_DIR, name)
-##			exportNetwork(filename=filepath_san_ext, type='CX')
-##			filepathCx <- paste0(filepath_san_ext, '.cx')
-##			cx <- readLines(filepathCx, warn=FALSE)
-##			rcx <- rcx_fromJSON(cx)
-##			#rcx <- rcx_asNewNetwork(rcx)
-##			rcx$networkAttributes$d[is.na(rcx$networkAttributes$d)] <- "string"
-##			rcx$nodeAttributes$d[is.na(rcx$nodeAttributes$d)] <- "string"
-##			rcx$edgeAttributes$d[is.na(rcx$edgeAttributes$d)] <- "string"
-##			rcx$cyTableColumn$d[is.na(rcx$cyTableColumn$d)] <- "string"
-##			rcx$cyTableColumn$s[is.na(rcx$cyTableColumn$s)] <- 0
-##			rcx$networkAttributes$s[is.na(rcx$networkAttributes$s)] <- 0
-##			rcx$nodeAttributes$s[is.na(rcx$nodeAttributes$s)] <- 0
-##			rcx$edgeAttributes$s[is.na(rcx$edgeAttributes$s)] <- 0
-##			rcx$cyVisualProperties$applies_to[is.na(rcx$cyVisualProperties$applies_to)] <- 0
-##			rcx$cySubNetworks <- NULL
-##			rcx$cyViews <- NULL
-##			rcx$cyNetworkRelations <- NULL
-##			rcx$cyTableColumn <- NULL
-##			rcx$cyVisualProperties$view <- NULL
-##			rcx$cartesianLayout$view <- NULL
-##			rcx <- rcx_updateMetaData(rcx)
-#
-#			print('rcx B')
-#			print(str(rcx, max.level = 2))
-#			networkId <- ndex_update_network(ndexcon, rcx, networkId)
-#			#ndex_create_network(ndexcon, rcx)
-#
-#			result[["error"]] <- NA
-#			result[["success"]] <- TRUE
-#			result[["output"]] <- networkId
 		} else {
 			# NOTE: we need to use cyrestPOST in order to submit to the test/dev2 server.
 			# exportNetworkToNDEx only submits to production server.
-			print('Creating...')
+			print(paste0('Pathway ', wikipathwaysID, ' not found in NDEx. Posting as new network.'))
 			res <- cyrestPOST(paste('networks', suid, sep = '/'),
 				      body = list(serverUrl=NDEX_SERVER_URL,
 						  username=NDEX_USER,
@@ -650,18 +552,6 @@ wikipathways2ndex <- function(OUTPUT_DIR, preprocessed, wikipathwaysID) {
 			  authenticate(NDEX_USER, NDEX_PWD)
 			  )
 		stop_for_status(r)
-
-#		# the code below is supposed to send a list of strings:
-#		# but it's returning a 500 error:
-#		propertiesResponse <- PUT(
-#			 paste(NDEX_SERVER_URL, 'network', networkId, 'properties', sep = '/'),
-#			 body = list(predicateString="mykey", dataType="string", value="myvalue"),
-#			 encode = "json",
-#			 authenticate(NDEX_USER, NDEX_PWD)
-#			 )
-#		print(propertiesResponse)
-#		print(str(propertiesResponse))
-#		stop_for_status(propertiesResponse)
 
 		# if we get an error when trying to make readOnly, we ignore it and continue.
 		tryCatch({
